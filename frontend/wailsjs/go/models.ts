@@ -18,11 +18,67 @@ export namespace main {
 	        this.FeatureFlags = source["FeatureFlags"];
 	    }
 	}
+	export class WorkflowParameter {
+	    Key: string;
+	    Label: string;
+	    Type: string;
+	    Required: boolean;
+	    Options: string[];
+	    DefaultValue: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new WorkflowParameter(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.Key = source["Key"];
+	        this.Label = source["Label"];
+	        this.Type = source["Type"];
+	        this.Required = source["Required"];
+	        this.Options = source["Options"];
+	        this.DefaultValue = source["DefaultValue"];
+	    }
+	}
+	export class WorkflowDef {
+	    Name: string;
+	    WorkflowID: string;
+	    AppID: string;
+	    Parameters: WorkflowParameter[];
+	
+	    static createFrom(source: any = {}) {
+	        return new WorkflowDef(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.Name = source["Name"];
+	        this.WorkflowID = source["WorkflowID"];
+	        this.AppID = source["AppID"];
+	        this.Parameters = this.convertValues(source["Parameters"], WorkflowParameter);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class WorkflowConfig {
-	    MaxConcurrentJobs: number;
-	    JobTimeout: number;
-	    RetryCount: number;
-	    WorkspacePath: string;
+	    ApiKey: string;
+	    Workflows: Record<string, WorkflowDef>;
 	
 	    static createFrom(source: any = {}) {
 	        return new WorkflowConfig(source);
@@ -30,11 +86,27 @@ export namespace main {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.MaxConcurrentJobs = source["MaxConcurrentJobs"];
-	        this.JobTimeout = source["JobTimeout"];
-	        this.RetryCount = source["RetryCount"];
-	        this.WorkspacePath = source["WorkspacePath"];
+	        this.ApiKey = source["ApiKey"];
+	        this.Workflows = this.convertValues(source["Workflows"], WorkflowDef, true);
 	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	export class EduExpConfig {
 	    ServerPort: string;
@@ -56,11 +128,6 @@ export namespace main {
 	}
 	export class GlobalConfig {
 	    Theme: string;
-	    Language: string;
-	    AutoStart: boolean;
-	    EnableNotifications: boolean;
-	    LogLevel: string;
-	    MaxLogEntries: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new GlobalConfig(source);
@@ -69,11 +136,6 @@ export namespace main {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.Theme = source["Theme"];
-	        this.Language = source["Language"];
-	        this.AutoStart = source["AutoStart"];
-	        this.EnableNotifications = source["EnableNotifications"];
-	        this.LogLevel = source["LogLevel"];
-	        this.MaxLogEntries = source["MaxLogEntries"];
 	    }
 	}
 	export class Config {
@@ -133,6 +195,8 @@ export namespace main {
 	        this.WorkDir = source["WorkDir"];
 	    }
 	}
+	
+	
 
 }
 

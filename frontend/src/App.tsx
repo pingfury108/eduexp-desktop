@@ -1,12 +1,32 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import './App.css';
 import WorkflowPage from './components/WorkflowPage';
 import ApiServerPage from './components/ApiServerPage';
 import SettingsPage from './components/SettingsPage';
+import { GetGlobalConfig } from '../wailsjs/go/main/App';
 
 function App() {
   const [activeTab, setActiveTab] = useState('api-server');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [currentTheme, setCurrentTheme] = useState('light');
+
+  // 加载并应用主题设置
+  useEffect(() => {
+    const loadTheme = async () => {
+      try {
+        const globalConfig = await GetGlobalConfig();
+        const theme = globalConfig.Theme || 'light';
+        setCurrentTheme(theme);
+        document.documentElement.setAttribute('data-theme', theme);
+      } catch (error) {
+        console.error('Failed to load theme:', error);
+        // 使用默认主题
+        document.documentElement.setAttribute('data-theme', 'light');
+      }
+    };
+
+    loadTheme();
+  }, []);
 
   const navigationItems = [
     {

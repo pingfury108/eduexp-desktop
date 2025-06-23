@@ -18,12 +18,7 @@ type Config struct {
 
 // GlobalConfig 全局配置
 type GlobalConfig struct {
-	Theme               string `toml:"theme"`                // 主题: light/dark
-	Language            string `toml:"language"`             // 语言: zh-CN/en-US
-	AutoStart           bool   `toml:"auto_start"`           // 开机自启动
-	EnableNotifications bool   `toml:"enable_notifications"` // 启用通知
-	LogLevel            string `toml:"log_level"`            // 日志级别: debug/info/warning/error
-	MaxLogEntries       int    `toml:"max_log_entries"`      // 最大日志条数
+	Theme string `toml:"theme"` // 主题: light/dark
 }
 
 // EduExpConfig EduExp模块配置
@@ -37,11 +32,26 @@ type EduExpConfig struct {
 
 // WorkflowConfig 工作流配置
 type WorkflowConfig struct {
-	// TODO: 添加工作流相关配置项
-	MaxConcurrentJobs int    `toml:"max_concurrent_jobs"` // 最大并发任务数
-	JobTimeout        int    `toml:"job_timeout"`         // 任务超时时间(秒)
-	RetryCount        int    `toml:"retry_count"`         // 重试次数
-	WorkspacePath     string `toml:"workspace_path"`      // 工作空间路径
+	ApiKey    string                 `toml:"apikey"`    // 扣子 API Key
+	Workflows map[string]WorkflowDef `toml:"workflows"` // 工作流定义
+}
+
+// WorkflowDef 工作流定义
+type WorkflowDef struct {
+	Name       string              `toml:"name"`        // 工作流名称
+	WorkflowID string              `toml:"workflow_id"` // 工作流ID
+	AppID      string              `toml:"app_id"`      // 应用ID
+	Parameters []WorkflowParameter `toml:"parameters"`  // 参数列表
+}
+
+// WorkflowParameter 工作流参数
+type WorkflowParameter struct {
+	Key          string   `toml:"key"`           // 参数键
+	Label        string   `toml:"label"`         // 参数标签
+	Type         string   `toml:"type"`          // 参数类型
+	Required     bool     `toml:"required"`      // 是否必需
+	Options      []string `toml:"options"`       // 选项列表（用于select类型）
+	DefaultValue string   `toml:"default_value"` // 默认值
 }
 
 // LicenseConfig 许可配置
@@ -93,12 +103,7 @@ func NewConfigManager() (*ConfigManager, error) {
 func GetDefaultConfig() *Config {
 	return &Config{
 		Global: GlobalConfig{
-			Theme:               "light",
-			Language:            "zh-CN",
-			AutoStart:           false,
-			EnableNotifications: true,
-			LogLevel:            "info",
-			MaxLogEntries:       1000,
+			Theme: "light",
 		},
 		EduExp: EduExpConfig{
 			ServerPort:    "8080",
@@ -107,10 +112,8 @@ func GetDefaultConfig() *Config {
 			BackupEnabled: true,
 		},
 		Workflow: WorkflowConfig{
-			MaxConcurrentJobs: 5,
-			JobTimeout:        300,
-			RetryCount:        3,
-			WorkspacePath:     "",
+			ApiKey:    "",
+			Workflows: map[string]WorkflowDef{},
 		},
 		License: LicenseConfig{
 			LicenseKey:   "",
