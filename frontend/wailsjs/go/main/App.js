@@ -6,6 +6,26 @@ export function GetAllProcessStatus() {
   return window['go']['main']['App']['GetAllProcessStatus']();
 }
 
+export function GetConfig() {
+  return window['go']['main']['App']['GetConfig']();
+}
+
+export function GetConfigInfo() {
+  return window['go']['main']['App']['GetConfigInfo']();
+}
+
+export function GetEduExpConfig() {
+  return window['go']['main']['App']['GetEduExpConfig']();
+}
+
+export function GetGlobalConfig() {
+  return window['go']['main']['App']['GetGlobalConfig']();
+}
+
+export function GetLicenseConfig() {
+  return window['go']['main']['App']['GetLicenseConfig']();
+}
+
 export function GetProcessOutput(arg1) {
   return window['go']['main']['App']['GetProcessOutput'](arg1);
 }
@@ -26,8 +46,16 @@ export function GetServerStatus() {
   return window['go']['main']['App']['GetServerStatus']();
 }
 
+export function GetWorkflowConfig() {
+  return window['go']['main']['App']['GetWorkflowConfig']();
+}
+
 export function RegisterProcess(arg1, arg2) {
   return window['go']['main']['App']['RegisterProcess'](arg1, arg2);
+}
+
+export function ResetConfig() {
+  return window['go']['main']['App']['ResetConfig']();
 }
 
 export function StartGinServer(arg1) {
@@ -44,4 +72,20 @@ export function StopGinServer() {
 
 export function StopProcess(arg1) {
   return window['go']['main']['App']['StopProcess'](arg1);
+}
+
+export function UpdateEduExpConfig(arg1) {
+  return window['go']['main']['App']['UpdateEduExpConfig'](arg1);
+}
+
+export function UpdateGlobalConfig(arg1) {
+  return window['go']['main']['App']['UpdateGlobalConfig'](arg1);
+}
+
+export function UpdateLicenseConfig(arg1) {
+  return window['go']['main']['App']['UpdateLicenseConfig'](arg1);
+}
+
+export function UpdateWorkflowConfig(arg1) {
+  return window['go']['main']['App']['UpdateWorkflowConfig'](arg1);
 }

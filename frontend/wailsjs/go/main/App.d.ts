@@ -4,6 +4,16 @@ import {main} from '../models';
 
 export function GetAllProcessStatus():Promise<Record<string, string>>;
 
+export function GetConfig():Promise<main.Config>;
+
+export function GetConfigInfo():Promise<Record<string, string>>;
+
+export function GetEduExpConfig():Promise<main.EduExpConfig>;
+
+export function GetGlobalConfig():Promise<main.GlobalConfig>;
+
+export function GetLicenseConfig():Promise<main.LicenseConfig>;
+
 export function GetProcessOutput(arg1:string):Promise<string>;
 
 export function GetProcessStatus(arg1:string):Promise<string>;
@@ -14,7 +24,11 @@ export function GetServerOutput():Promise<string>;
 
 export function GetServerStatus():Promise<string>;
 
+export function GetWorkflowConfig():Promise<main.WorkflowConfig>;
+
 export function RegisterProcess(arg1:string,arg2:main.ProcessConfig):Promise<void>;
+
+export function ResetConfig():Promise<string>;
 
 export function StartGinServer(arg1:string):Promise<string>;
 
@@ -23,3 +37,11 @@ export function StartProcess(arg1:string,arg2:Array<string>):Promise<string>;
 export function StopGinServer():Promise<string>;
 
 export function StopProcess(arg1:string):Promise<string>;
+
+export function UpdateEduExpConfig(arg1:main.EduExpConfig):Promise<string>;
+
+export function UpdateGlobalConfig(arg1:main.GlobalConfig):Promise<string>;
+
+export function UpdateLicenseConfig(arg1:main.LicenseConfig):Promise<string>;
+
+export function UpdateWorkflowConfig(arg1:main.WorkflowConfig):Promise<string>;

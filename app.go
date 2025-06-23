@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/signal"
 	"sync"
@@ -12,12 +13,22 @@ import (
 type App struct {
 	ctx            context.Context
 	processManager *ProcessManager // 进程管理器
+	configManager  *ConfigManager  // 配置管理器
 	exitOnce       sync.Once       // 确保退出逻辑只执行一次
 }
 
 // NewApp creates a new App application struct
 func NewApp() *App {
 	app := &App{}
+
+	// 初始化配置管理器
+	var err error
+	app.configManager, err = NewConfigManager()
+	if err != nil {
+		// 如果配置管理器初始化失败，记录错误但不阻止应用启动
+		// TODO: 这里可以添加日志记录
+		_ = err
+	}
 
 	// 在 Wails 中，主要依赖 OnShutdown 和 OnBeforeClose 钩子
 	// 但仍然保留系统信号监听作为备用
@@ -141,4 +152,129 @@ func (a *App) GetServerStatus() string {
 // GetServerOutput 获取输出日志（兼容旧接口）
 func (a *App) GetServerOutput() string {
 	return a.GetProcessOutput("caddy-fileserver")
+}
+
+// ===============================
+// 配置管理相关接口
+// ===============================
+
+// GetConfig 获取完整配置
+func (a *App) GetConfig() *Config {
+	if a.configManager != nil {
+		return a.configManager.GetConfig()
+	}
+	return GetDefaultConfig()
+}
+
+// GetGlobalConfig 获取全局配置
+func (a *App) GetGlobalConfig() GlobalConfig {
+	if a.configManager != nil {
+		return a.configManager.GetConfig().Global
+	}
+	return GetDefaultConfig().Global
+}
+
+// UpdateGlobalConfig 更新全局配置
+func (a *App) UpdateGlobalConfig(config GlobalConfig) string {
+	if a.configManager == nil {
+		return "Config manager not initialized"
+	}
+
+	err := a.configManager.UpdateGlobalConfig(config)
+	if err != nil {
+		return fmt.Sprintf("Failed to update global config: %v", err)
+	}
+	return "Global config updated successfully"
+}
+
+// GetEduExpConfig 获取EduExp配置
+func (a *App) GetEduExpConfig() EduExpConfig {
+	if a.configManager != nil {
+		return a.configManager.GetConfig().EduExp
+	}
+	return GetDefaultConfig().EduExp
+}
+
+// UpdateEduExpConfig 更新EduExp配置
+func (a *App) UpdateEduExpConfig(config EduExpConfig) string {
+	if a.configManager == nil {
+		return "Config manager not initialized"
+	}
+
+	err := a.configManager.UpdateEduExpConfig(config)
+	if err != nil {
+		return fmt.Sprintf("Failed to update EduExp config: %v", err)
+	}
+	return "EduExp config updated successfully"
+}
+
+// GetWorkflowConfig 获取工作流配置
+func (a *App) GetWorkflowConfig() WorkflowConfig {
+	if a.configManager != nil {
+		return a.configManager.GetConfig().Workflow
+	}
+	return GetDefaultConfig().Workflow
+}
+
+// UpdateWorkflowConfig 更新工作流配置
+func (a *App) UpdateWorkflowConfig(config WorkflowConfig) string {
+	if a.configManager == nil {
+		return "Config manager not initialized"
+	}
+
+	err := a.configManager.UpdateWorkflowConfig(config)
+	if err != nil {
+		return fmt.Sprintf("Failed to update workflow config: %v", err)
+	}
+	return "Workflow config updated successfully"
+}
+
+// GetLicenseConfig 获取许可配置
+func (a *App) GetLicenseConfig() LicenseConfig {
+	if a.configManager != nil {
+		return a.configManager.GetConfig().License
+	}
+	return GetDefaultConfig().License
+}
+
+// UpdateLicenseConfig 更新许可配置
+func (a *App) UpdateLicenseConfig(config LicenseConfig) string {
+	if a.configManager == nil {
+		return "Config manager not initialized"
+	}
+
+	err := a.configManager.UpdateLicenseConfig(config)
+	if err != nil {
+		return fmt.Sprintf("Failed to update license config: %v", err)
+	}
+	return "License config updated successfully"
+}
+
+// ResetConfig 重置配置为默认值
+func (a *App) ResetConfig() string {
+	if a.configManager == nil {
+		return "Config manager not initialized"
+	}
+
+	err := a.configManager.ResetToDefault()
+	if err != nil {
+		return fmt.Sprintf("Failed to reset config: %v", err)
+	}
+	return "Config reset to default successfully"
+}
+
+// GetConfigInfo 获取配置信息
+func (a *App) GetConfigInfo() map[string]string {
+	info := make(map[string]string)
+
+	if a.configManager == nil {
+		info["status"] = "Config manager not initialized"
+		return info
+	}
+
+	info["config_dir"] = a.configManager.GetConfigDir()
+	info["config_file"] = a.configManager.GetConfigFile()
+	info["status"] = "Initialized"
+
+	return info
 }
