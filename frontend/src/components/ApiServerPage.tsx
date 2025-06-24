@@ -1,225 +1,444 @@
 import { useState, useEffect } from 'react';
-import { StartGinServer, StopGinServer, GetServerOutput, GetServerStatus } from "../../wailsjs/go/main/App";
+import { StartEduTools, StopEduTools, GetEduToolsStatus, GetEduToolsOutput } from "../../wailsjs/go/main/App";
+
+interface EduToolsService {
+  status: 'running' | 'stopped' | 'error';
+  port: string;
+  startTime?: string;
+}
 
 export default function ApiServerPage() {
-  const [resultText, setResultText] = useState("Enter a port number and click Start Server");
-  const [port, setPort] = useState('8080');
-  const [serverStatus, setServerStatus] = useState('stopped');
-  const [serverLogs, setServerLogs] = useState<string[]>([]);
-  const [isRunning, setIsRunning] = useState(false);
+  // EduTools 服务状态管理
+  const [eduToolsService, setEduToolsService] = useState<EduToolsService>({
+    status: 'stopped',
+    port: '8080'
+  });
+  
+  const [isPortModalOpen, setIsPortModalOpen] = useState(false);
+  const [isLogModalOpen, setIsLogModalOpen] = useState(false);
+  const [isErrorModalOpen, setIsErrorModalOpen] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [isUrlModalOpen, setIsUrlModalOpen] = useState(false);
+  const [tempPort, setTempPort] = useState('8080');
+  const [logs, setLogs] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const updatePort = (e: React.ChangeEvent<HTMLInputElement>) => setPort(e.target.value);
-
-  // Function to fetch server status periodically
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (isRunning) {
-        GetServerStatus()
-          .then((status: string) => setServerStatus(status))
-          .catch(() => setServerStatus('unknown'));
+  // EduTools 状态检查
+  const checkEduToolsStatus = async () => {
+    try {
+      const status = await GetEduToolsStatus();
+      if (status.includes('running') || status.includes('started')) {
+        setEduToolsService(prev => ({ ...prev, status: 'running' }));
+      } else if (status.includes('not running') || status.includes('stopped')) {
+        setEduToolsService(prev => ({ ...prev, status: 'stopped' }));
+      } else {
+        setEduToolsService(prev => ({ ...prev, status: 'error' }));
       }
-    }, 2000);
+    } catch (error) {
+      setEduToolsService(prev => ({ ...prev, status: 'error' }));
+    }
+  };
+
+  // EduTools 日志获取
+  const fetchEduToolsLogs = async () => {
+    try {
+      const output = await GetEduToolsOutput();
+      if (output && output.trim()) {
+        const logLines = output.split('\n').filter((line: string) => line.trim());
+        setLogs(logLines);
+      }
+    } catch (error) {
+      console.error('Failed to fetch logs:', error);
+    }
+  };
+
+  const savePortConfig = async () => {
+    try {
+      setEduToolsService(prev => ({ ...prev, port: tempPort }));
+      setIsPortModalOpen(false);
+    } catch (error) {
+      console.error('Failed to save port config:', error);
+    }
+  };
+
+  // EduTools 状态定期检查
+  useEffect(() => {
+    checkEduToolsStatus();
+    const interval = setInterval(checkEduToolsStatus, 3000);
     return () => clearInterval(interval);
-  }, [isRunning]);
+  }, []);
 
-  async function startServer() {
+  // EduTools 启动
+  const handleStartEduTools = async () => {
+    setIsLoading(true);
     try {
-      const message = await StartGinServer(port);
-      setResultText(message);
-      setIsRunning(true);
-      await fetchLogs();
+      const result = await StartEduTools([]);
+      if (result.includes('successfully') || result.includes('started')) {
+        setEduToolsService(prev => ({ ...prev, status: 'running', startTime: new Date().toLocaleString() }));
+        await fetchEduToolsLogs();
+      } else {
+        setEduToolsService(prev => ({ ...prev, status: 'error' }));
+        
+        const errorMsg = result.startsWith('ERROR:') ? result : `启动失败: ${result}`;
+        setErrorMessage(errorMsg);
+        setIsErrorModalOpen(true);
+        
+        console.error('Failed to start EduTools:', result);
+      }
     } catch (error) {
-      setResultText(`Error: ${error instanceof Error ? error.message : String(error)}`);
+      console.error('Error starting EduTools:', error);
+      setEduToolsService(prev => ({ ...prev, status: 'error' }));
+      setErrorMessage(`启动 EduTools 时发生异常: ${error}`);
+      setIsErrorModalOpen(true);
+    } finally {
+      setIsLoading(false);
     }
-  }
+  };
 
-  async function stopServer() {
+  // EduTools 停止
+  const handleStopEduTools = async () => {
+    setIsLoading(true);
     try {
-      const message = await StopGinServer();
-      setResultText(message);
-      setIsRunning(false);
-      await fetchLogs();
+      await StopEduTools();
+      setEduToolsService(prev => ({ ...prev, status: 'stopped', startTime: undefined }));
+      await fetchEduToolsLogs();
     } catch (error) {
-      setResultText(`Error: ${error instanceof Error ? error.message : String(error)}`);
-    }
-  }
-
-  async function fetchLogs() {
-    try {
-      const logs = await GetServerOutput();
-      setServerLogs(logs.split('\n').filter(line => line.trim() !== ''));
-    } catch (error) {
-      setServerLogs([`Error fetching logs: ${error instanceof Error ? error.message : String(error)}`]);
-    }
-  }
-
-  const getStatusBadgeClass = () => {
-    switch (serverStatus.toLowerCase()) {
-      case 'running':
-        return 'badge badge-success';
-      case 'stopped':
-        return 'badge badge-error';
-      default:
-        return 'badge badge-warning';
+      console.error('Error stopping EduTools:', error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
   return (
     <div className="p-6">
       <div className="max-w-4xl">
-        <div className="mb-8">
-          <h2 className="text-3xl font-bold text-base-content mb-2">API服务器管理</h2>
-          <p className="text-base-content opacity-70">管理您的 Gin Web 服务器</p>
-        </div>
-
-        {/* Server Status Overview */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="stat bg-base-100 shadow-lg rounded-lg">
-            <div className="stat-figure text-primary">
-              <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" />
-              </svg>
-            </div>
-            <div className="stat-title">服务器状态</div>
-            <div className={`stat-value ${serverStatus === 'running' ? 'text-success' : 'text-error'}`}>
-              {serverStatus === 'running' ? '运行中' : '已停止'}
-            </div>
-          </div>
-          
-          <div className="stat bg-base-100 shadow-lg rounded-lg">
-            <div className="stat-figure text-info">
-              <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m16-6h2m-2 6h2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
-              </svg>
-            </div>
-            <div className="stat-title">端口</div>
-            <div className="stat-value text-info">{port}</div>
-          </div>
-          
-          <div className="stat bg-base-100 shadow-lg rounded-lg">
-            <div className="stat-figure text-secondary">
-              <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-            </div>
-            <div className="stat-title">日志条数</div>
-            <div className="stat-value text-secondary">{serverLogs.length}</div>
-          </div>
-        </div>
-
-        {/* Main Controls Card */}
-        <div className="card bg-base-100 shadow-xl mb-6">
+        {/* EduTools 服务管理 */}
+        <div className="card bg-base-100 shadow-xl mb-8">
           <div className="card-body">
-            <h3 className="card-title text-xl mb-4">服务器控制</h3>
+            <h2 className="card-title text-xl mb-4">
+              EduTools 服务管理
+            </h2>
             
-            {/* Server Controls */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-              <div className="form-control">
-                <label className="label">
-                  <span className="label-text font-medium text-base-content">端口号</span>
-                </label>
-                <input
-                  type="number"
-                  className="input input-bordered w-full text-base-content"
-                  value={port}
-                  onChange={updatePort}
-                  placeholder="输入端口号"
-                  disabled={isRunning}
-                />
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+              <div className="stat bg-base-200 rounded-lg">
+                <div className="stat-title">服务端口</div>
+                <div className="stat-value text-2xl flex items-center gap-2">
+                  {eduToolsService.port}
+                  <button 
+                    className="btn btn-ghost btn-sm"
+                    onClick={() => setIsPortModalOpen(true)}
+                    title="编辑端口"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
+                  </button>
+                </div>
               </div>
               
-              <div className="form-control">
-                <label className="label">
-                  <span className="label-text font-medium text-base-content">服务器状态</span>
-                </label>
-                <div className="flex items-center gap-2">
-                  <span className={getStatusBadgeClass()}>
-                    {serverStatus === 'running' ? '运行中' : serverStatus === 'stopped' ? '已停止' : '未知'}
+              <div className="stat bg-base-200 rounded-lg">
+                <div className="stat-title">运行状态</div>
+                <div className="stat-value text-xl">
+                  <span className={
+                    eduToolsService.status === 'running' ? 'badge badge-success' :
+                    eduToolsService.status === 'stopped' ? 'badge badge-warning' : 'badge badge-error'
+                  }>
+                    {eduToolsService.status === 'running' ? '运行中' : 
+                     eduToolsService.status === 'stopped' ? '已停止' : '错误'}
                   </span>
+                </div>
+              </div>
+              
+              <div className="stat bg-base-200 rounded-lg">
+                <div className="stat-title">服务日志</div>
+                <div className="stat-value text-lg">
                   <button 
                     className="btn btn-outline btn-sm"
-                    onClick={fetchLogs}
+                    onClick={() => {
+                      setIsLogModalOpen(true);
+                      fetchEduToolsLogs();
+                    }}
                   >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                    刷新
+                    查看日志
                   </button>
                 </div>
               </div>
             </div>
 
-            {/* Action Buttons */}
-            <div className="flex gap-4 mb-6">
+            <div className="flex gap-4">
+              {eduToolsService.status === 'running' ? (
+                <button
+                  className="btn btn-warning"
+                  onClick={handleStopEduTools}
+                  disabled={isLoading}
+                >
+                  {isLoading && <span className="loading loading-spinner loading-sm mr-2"></span>}
+                  停止服务
+                </button>
+              ) : (
+                <button
+                  className="btn btn-success"
+                  onClick={handleStartEduTools}
+                  disabled={isLoading}
+                >
+                  {isLoading && <span className="loading loading-spinner loading-sm mr-2"></span>}
+                  启动服务
+                </button>
+              )}
+              
               <button
-                className={`btn flex-1 ${isRunning ? 'btn-disabled' : 'btn-success'}`}
-                onClick={startServer}
-                disabled={isRunning}
+                className="btn btn-outline"
+                onClick={() => {
+                  const url = `http://localhost:${eduToolsService.port}`;
+                  console.log('尝试打开URL:', url);
+                  
+                  // 尝试打开新窗口
+                  const newWindow = window.open(url, '_blank', 'noopener,noreferrer');
+                  
+                  // 检查是否成功打开 - 延迟检查以避免误判
+                  setTimeout(() => {
+                    if (!newWindow || newWindow.closed || typeof newWindow.closed == 'undefined') {
+                      // 如果弹窗被阻止，显示URL模态框
+                      setIsUrlModalOpen(true);
+                    }
+                  }, 500);
+                }}
+                disabled={eduToolsService.status !== 'running'}
+                title={eduToolsService.status !== 'running' ? '服务未运行' : `访问 http://localhost:${eduToolsService.port}`}
               >
-                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h1m4 0h1m-6 4h.01M15 14h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                 </svg>
-                启动服务器
-              </button>
-              <button
-                className={`btn flex-1 ${!isRunning ? 'btn-disabled' : 'btn-error'}`}
-                onClick={stopServer}
-                disabled={!isRunning}
-              >
-                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 10h6v4H9z" />
-                </svg>
-                停止服务器
+                访问服务
               </button>
             </div>
+          </div>
 
-            {/* Result Alert */}
-            <div className={`alert ${serverStatus === 'running' ? 'alert-success' : 'alert-info'}`}>
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <span>{resultText}</span>
+          {/* 日志模态框 */}
+          {isLogModalOpen && (
+            <div className="modal modal-open">
+              <div className="modal-box max-w-4xl">
+                <h3 className="font-bold text-lg mb-4">EduTools 日志</h3>
+                <div className="bg-base-300 rounded p-4 font-mono text-sm h-64 overflow-y-auto">
+                  {logs.length === 0 ? (
+                    <div className="text-center py-8 opacity-50">暂无日志输出</div>
+                  ) : (
+                    logs.map((log, index) => (
+                      <div key={index} className="mb-1">{log}</div>
+                    ))
+                  )}
+                </div>
+                <div className="modal-action">
+                  <button className="btn" onClick={() => setIsLogModalOpen(false)}>关闭</button>
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
+          )}
 
-        {/* Server Logs Card */}
-        <div className="card bg-base-100 shadow-xl">
-          <div className="card-header p-4 border-b border-base-300">
-            <div className="flex justify-between items-center">
-              <h3 className="card-title text-lg font-semibold">
-                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-                服务器日志
-              </h3>
-              <button 
-                className="btn btn-outline btn-sm"
-                onClick={() => setServerLogs([])}
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                </svg>
-                清空日志
-              </button>
+          {/* 端口编辑模态框 */}
+          {isPortModalOpen && (
+            <div className="modal modal-open">
+              <div className="modal-box">
+                <h3 className="font-bold text-lg mb-4">编辑服务端口</h3>
+                <div className="form-control">
+                  <label className="label">
+                    <span className="label-text">端口号</span>
+                  </label>
+                  <input
+                    type="number"
+                    className="input input-bordered"
+                    value={tempPort}
+                    onChange={(e) => setTempPort(e.target.value)}
+                    placeholder="请输入端口号"
+                    min="1"
+                    max="65535"
+                  />
+                  <label className="label">
+                    <span className="label-text-alt">端口范围：1-65535</span>
+                  </label>
+                </div>
+                <div className="modal-action">
+                  <button 
+                    className="btn btn-primary" 
+                    onClick={savePortConfig}
+                    disabled={!tempPort || parseInt(tempPort) < 1 || parseInt(tempPort) > 65535}
+                  >
+                    保存
+                  </button>
+                  <button 
+                    className="btn" 
+                    onClick={() => {
+                      setIsPortModalOpen(false);
+                      setTempPort(eduToolsService.port);
+                    }}
+                  >
+                    取消
+                  </button>
+                </div>
+              </div>
             </div>
-          </div>
-          <div className="card-body p-4">
-            <div className="mockup-code bg-base-300 max-h-96 overflow-y-auto">
-              {serverLogs.length > 0 ? (
-                                  serverLogs.map((log, index) => (
-                    <pre key={index} className="text-sm">
-                      <code className="text-base-content opacity-80">{log}</code>
-                    </pre>
-                  ))
-                ) : (
-                  <pre className="text-sm">
-                    <code className="text-base-content opacity-60">暂无日志信息</code>
-                  </pre>
-                )}
+          )}
+
+          {/* 错误信息弹窗 */}
+          {isErrorModalOpen && (
+            <div className="modal modal-open">
+              <div className="modal-box">
+                <div className="flex items-center gap-4 mb-4">
+                  <div className="flex-shrink-0">
+                    <svg className="w-8 h-8 text-error" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.5 0L4.268 19.5c-.77.833.192 2.5 1.732 2.5z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-lg text-error">启动失败</h3>
+                    <p className="text-sm opacity-70">EduTools 进程启动时遇到错误</p>
+                  </div>
+                </div>
+                
+                <div className="bg-base-200 rounded-lg p-4 mb-4">
+                  <h4 className="font-semibold text-sm mb-2">错误详情：</h4>
+                  <div className="text-sm font-mono whitespace-pre-wrap break-words max-h-60 overflow-y-auto">
+                    {errorMessage}
+                  </div>
+                </div>
+                
+                <div className="flex gap-2 text-sm opacity-70 mb-4">
+                  <svg className="w-4 h-4 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <div>
+                    <p>请检查以下可能的原因：</p>
+                    <ul className="list-disc list-inside mt-1 space-y-1">
+                      <li>可执行文件是否存在于 bin 目录</li>
+                      <li>配置文件是否正确</li>
+                      <li>端口是否被占用</li>
+                      <li>是否有足够的权限</li>
+                    </ul>
+                  </div>
+                </div>
+                
+                <div className="modal-action">
+                  <button 
+                    className="btn btn-outline"
+                    onClick={() => {
+                      setIsLogModalOpen(true);
+                      fetchEduToolsLogs();
+                      setIsErrorModalOpen(false);
+                    }}
+                  >
+                    查看日志
+                  </button>
+                  <button 
+                    className="btn btn-primary" 
+                    onClick={() => setIsErrorModalOpen(false)}
+                  >
+                    确定
+                  </button>
+                </div>
+              </div>
             </div>
-          </div>
+          )}
+
+          {/* URL访问模态框 */}
+          {isUrlModalOpen && (
+            <div className="modal modal-open">
+              <div className="modal-box">
+                <div className="flex items-center gap-4 mb-4">
+                  <div className="flex-shrink-0">
+                    <svg className="w-8 h-8 text-info" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-lg text-info">访问服务</h3>
+                    <p className="text-sm opacity-70">浏览器可能阻止了弹窗，请手动访问服务</p>
+                  </div>
+                </div>
+                
+                <div className="bg-base-200 rounded-lg p-4 mb-4">
+                  <h4 className="font-semibold text-sm mb-2">服务地址：</h4>
+                  <div className="flex items-center gap-2">
+                    <input 
+                      type="text" 
+                      className="input input-bordered flex-1 font-mono text-sm"
+                      value={`http://localhost:${eduToolsService.port}`}
+                      readOnly
+                    />
+                    <button 
+                      className="btn btn-square btn-outline btn-sm"
+                      onClick={() => {
+                        const url = `http://localhost:${eduToolsService.port}`;
+                        if (navigator.clipboard) {
+                          navigator.clipboard.writeText(url).then(() => {
+                            alert('地址已复制到剪贴板！');
+                          }).catch(err => {
+                            console.error('复制失败:', err);
+                            alert('复制失败，请手动复制地址');
+                          });
+                        } else {
+                          alert('浏览器不支持自动复制，请手动复制地址');
+                        }
+                      }}
+                      title="复制地址"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+                
+                <div className="alert alert-info mb-4">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span className="text-sm">
+                    如果无法访问服务，请检查：
+                    <br />• 服务是否正常运行
+                    <br />• 端口 {eduToolsService.port} 是否被占用
+                    <br />• 防火墙是否允许该端口
+                  </span>
+                </div>
+                
+                <div className="modal-action">
+                  <button 
+                    className="btn btn-outline"
+                    onClick={() => {
+                      const url = `http://localhost:${eduToolsService.port}`;
+                      window.location.href = url;
+                    }}
+                  >
+                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    </svg>
+                    在当前页面访问
+                  </button>
+                  <button 
+                    className="btn btn-outline"
+                    onClick={() => {
+                      const url = `http://localhost:${eduToolsService.port}`;
+                      try {
+                        window.open(url, '_blank', 'noopener,noreferrer');
+                      } catch (error) {
+                        console.error('打开新窗口失败:', error);
+                      }
+                    }}
+                  >
+                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    </svg>
+                    重试新窗口
+                  </button>
+                  <button 
+                    className="btn btn-primary" 
+                    onClick={() => setIsUrlModalOpen(false)}
+                  >
+                    关闭
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
