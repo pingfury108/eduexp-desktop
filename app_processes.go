@@ -62,8 +62,12 @@ func (a *App) StartWorkflowUI(extraArgs []string) string {
 		"--config", "config.json", // 使用相对路径，因为工作目录就是数据目录
 	}
 
-	// 添加默认端口参数
-	args = append(args, "--port", "8080")
+	// 使用配置中的端口
+	port := config.Workflow.WorkflowUIPort
+	if port == "" {
+		port = "8080" // 默认端口
+	}
+	args = append(args, "--port", port)
 
 	// 添加额外参数
 	args = append(args, extraArgs...)
@@ -73,8 +77,8 @@ func (a *App) StartWorkflowUI(extraArgs []string) string {
 
 	// 如果启动失败，添加更多调试信息
 	if !strings.Contains(result, "successfully") {
-		debugInfo := fmt.Sprintf("\nDEBUG INFO:\n- Executable: %s\n- Working Directory: %s\n- Config File: %s\n- Arguments: %v",
-			workflowuiPath, workflowuiDataDir, configFile, args)
+		debugInfo := fmt.Sprintf("\nDEBUG INFO:\n- Executable: %s\n- Working Directory: %s\n- Config File: %s\n- Port: %s\n- Arguments: %v",
+			workflowuiPath, workflowuiDataDir, configFile, port, args)
 		result += debugInfo
 	}
 
@@ -132,6 +136,16 @@ func (a *App) GetWorkflowUIOutput() string {
 
 // StartEduTools 启动 EduTools 进程
 func (a *App) StartEduTools(extraArgs []string) string {
+	// 从配置管理器获取配置
+	if a.configManager == nil {
+		return "ERROR: Configuration manager not initialized"
+	}
+
+	config := a.configManager.GetConfig()
+	if config == nil {
+		return "ERROR: Failed to get configuration - please check your configuration file"
+	}
+
 	// 检查 edu-tools 可执行文件是否存在
 	binDir := filepath.Join(a.appDataDir, "bin")
 	eduToolsExe := a.getExecutableName("edu-tools")
@@ -146,13 +160,24 @@ func (a *App) StartEduTools(extraArgs []string) string {
 		return fmt.Sprintf("ERROR: Failed to create edu-tools data directory '%s': %v", eduToolsDataDir, err)
 	}
 
+	// 构建启动参数 - 使用配置中的端口
+	port := config.EduExp.EduToolsPort
+	if port == "" {
+		port = "8080" // 默认端口
+	}
+
+	args := []string{"--port", port}
+
+	// 添加额外参数
+	args = append(args, extraArgs...)
+
 	// 启动进程并返回结果
-	result := a.StartProcess("edu-tools", extraArgs...)
+	result := a.StartProcess("edu-tools", args...)
 
 	// 如果启动失败，添加更多调试信息
 	if !strings.Contains(result, "successfully") {
-		debugInfo := fmt.Sprintf("\nDEBUG INFO:\n- Executable: %s\n- Working Directory: %s\n- Arguments: %v",
-			eduToolsPath, eduToolsDataDir, extraArgs)
+		debugInfo := fmt.Sprintf("\nDEBUG INFO:\n- Executable: %s\n- Working Directory: %s\n- Port: %s\n- Arguments: %v",
+			eduToolsPath, eduToolsDataDir, port, args)
 		result += debugInfo
 	}
 

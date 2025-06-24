@@ -4,8 +4,8 @@ import {
   StopWorkflowUI, 
   GetWorkflowUIStatus, 
   GetWorkflowUIOutput,
-  GetEduExpConfig,
-  UpdateEduExpConfig
+  GetWorkflowConfig,
+  UpdateWorkflowConfig
 } from '../../wailsjs/go/main/App';
 
 interface WorkflowService {
@@ -17,7 +17,7 @@ interface WorkflowService {
 export default function WorkflowProcessManager() {
   const [workflowService, setWorkflowService] = useState<WorkflowService>({
     status: 'stopped',
-    port: '8081'
+    port: '8080'
   });
   
   const [isPortModalOpen, setIsPortModalOpen] = useState(false);
@@ -25,18 +25,21 @@ export default function WorkflowProcessManager() {
   const [isErrorModalOpen, setIsErrorModalOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [isUrlModalOpen, setIsUrlModalOpen] = useState(false);
-  const [tempPort, setTempPort] = useState('8081');
+  const [tempPort, setTempPort] = useState('8080');
   const [logs, setLogs] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
   const loadPortFromConfig = async () => {
     try {
-      // 使用默认端口，因为端口配置已从EduExp配置中移除
-      const defaultPort = '8080';
-      setWorkflowService(prev => ({ ...prev, port: defaultPort }));
-      setTempPort(defaultPort);
+      const workflowConfig = await GetWorkflowConfig();
+      const port = workflowConfig.WorkflowUIPort || '8080';
+      setWorkflowService(prev => ({ ...prev, port }));
+      setTempPort(port);
     } catch (error) {
       console.error('Failed to load port from config:', error);
+      // 使用默认端口
+      setWorkflowService(prev => ({ ...prev, port: '8080' }));
+      setTempPort('8080');
     }
   };
 
@@ -69,9 +72,24 @@ export default function WorkflowProcessManager() {
 
   const savePortConfig = async () => {
     try {
-      // 端口配置已从EduExp配置中移除，这里只更新本地状态
-      setWorkflowService(prev => ({ ...prev, port: tempPort }));
-      setIsPortModalOpen(false);
+      // 获取当前Workflow配置
+      const currentConfig = await GetWorkflowConfig();
+      
+      // 创建更新的配置对象
+      const updatedConfig = {
+        ApiKey: currentConfig.ApiKey,
+        WorkflowUIPort: tempPort,
+        Workflows: currentConfig.Workflows
+      };
+      
+      // 保存到配置
+      const result = await UpdateWorkflowConfig(updatedConfig as any);
+      if (result.includes('successfully')) {
+        setWorkflowService(prev => ({ ...prev, port: tempPort }));
+        setIsPortModalOpen(false);
+      } else {
+        console.error('Failed to save port config:', result);
+      }
     } catch (error) {
       console.error('Failed to save port config:', error);
     }

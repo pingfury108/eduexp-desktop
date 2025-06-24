@@ -78,6 +78,7 @@ export namespace main {
 	}
 	export class WorkflowConfig {
 	    ApiKey: string;
+	    WorkflowUIPort: string;
 	    Workflows: Record<string, WorkflowDef>;
 	
 	    static createFrom(source: any = {}) {
@@ -87,6 +88,7 @@ export namespace main {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.ApiKey = source["ApiKey"];
+	        this.WorkflowUIPort = source["WorkflowUIPort"];
 	        this.Workflows = this.convertValues(source["Workflows"], WorkflowDef, true);
 	    }
 	
@@ -113,6 +115,7 @@ export namespace main {
 	    ArkModeModel: string;
 	    ArkOcrModeModel: string;
 	    ArkTextModeModel: string;
+	    EduToolsPort: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new EduExpConfig(source);
@@ -124,6 +127,7 @@ export namespace main {
 	        this.ArkModeModel = source["ArkModeModel"];
 	        this.ArkOcrModeModel = source["ArkOcrModeModel"];
 	        this.ArkTextModeModel = source["ArkTextModeModel"];
+	        this.EduToolsPort = source["EduToolsPort"];
 	    }
 	}
 	export class GlobalConfig {

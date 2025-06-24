@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { StartEduTools, StopEduTools, GetEduToolsStatus, GetEduToolsOutput } from "../../wailsjs/go/main/App";
+import { StartEduTools, StopEduTools, GetEduToolsStatus, GetEduToolsOutput, GetEduExpConfig, UpdateEduExpConfig } from "../../wailsjs/go/main/App";
 
 interface EduToolsService {
   status: 'running' | 'stopped' | 'error';
@@ -52,10 +52,43 @@ export default function ApiServerPage() {
     }
   };
 
+  // 从配置加载端口号
+  const loadPortFromConfig = async () => {
+    try {
+      const eduExpConfig = await GetEduExpConfig();
+      const port = eduExpConfig.EduToolsPort || '8080';
+      setEduToolsService(prev => ({ ...prev, port }));
+      setTempPort(port);
+    } catch (error) {
+      console.error('Failed to load port from config:', error);
+      // 使用默认端口
+      setEduToolsService(prev => ({ ...prev, port: '8080' }));
+      setTempPort('8080');
+    }
+  };
+
   const savePortConfig = async () => {
     try {
-      setEduToolsService(prev => ({ ...prev, port: tempPort }));
-      setIsPortModalOpen(false);
+      // 获取当前EduExp配置
+      const currentConfig = await GetEduExpConfig();
+      
+      // 创建更新的配置对象
+      const updatedConfig = {
+        ArkApiKey: currentConfig.ArkApiKey,
+        ArkModeModel: currentConfig.ArkModeModel,
+        ArkOcrModeModel: currentConfig.ArkOcrModeModel,
+        ArkTextModeModel: currentConfig.ArkTextModeModel,
+        EduToolsPort: tempPort
+      };
+      
+      // 保存到配置
+      const result = await UpdateEduExpConfig(updatedConfig as any);
+      if (result.includes('successfully')) {
+        setEduToolsService(prev => ({ ...prev, port: tempPort }));
+        setIsPortModalOpen(false);
+      } else {
+        console.error('Failed to save port config:', result);
+      }
     } catch (error) {
       console.error('Failed to save port config:', error);
     }
@@ -63,6 +96,7 @@ export default function ApiServerPage() {
 
   // EduTools 状态定期检查
   useEffect(() => {
+    loadPortFromConfig();
     checkEduToolsStatus();
     const interval = setInterval(checkEduToolsStatus, 3000);
     return () => clearInterval(interval);

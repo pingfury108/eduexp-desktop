@@ -27,12 +27,14 @@ type EduExpConfig struct {
 	ArkModeModel     string `toml:"ark_mode_model"`      // ark mode 模型
 	ArkOcrModeModel  string `toml:"ark_ocr_mode_model"`  // ark ocr mode 模型
 	ArkTextModeModel string `toml:"ark_text_mode_model"` // ark text mode 模型
+	EduToolsPort     string `toml:"edu_tools_port"`      // EduTools 服务端口
 }
 
 // WorkflowConfig 工作流配置
 type WorkflowConfig struct {
-	ApiKey    string                 `toml:"apikey"`    // 扣子 API Key
-	Workflows map[string]WorkflowDef `toml:"workflows"` // 工作流定义
+	ApiKey         string                 `toml:"apikey"`           // 扣子 API Key
+	WorkflowUIPort string                 `toml:"workflow_ui_port"` // WorkflowUI 服务端口
+	Workflows      map[string]WorkflowDef `toml:"workflows"`        // 工作流定义
 }
 
 // WorkflowDef 工作流定义
@@ -109,10 +111,12 @@ func GetDefaultConfig() *Config {
 			ArkModeModel:     "",
 			ArkOcrModeModel:  "",
 			ArkTextModeModel: "",
+			EduToolsPort:     "8080",
 		},
 		Workflow: WorkflowConfig{
-			ApiKey:    "",
-			Workflows: map[string]WorkflowDef{},
+			ApiKey:         "",
+			WorkflowUIPort: "8080",
+			Workflows:      map[string]WorkflowDef{},
 		},
 		License: LicenseConfig{
 			LicenseKey:   "",
