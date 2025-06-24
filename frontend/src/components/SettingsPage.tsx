@@ -269,9 +269,28 @@ export default function SettingsPage() {
           console.log('Saved eduexp settings:', settings);
           break;
         case 'workflow':
+          // 转换前端工作流数据结构到后端格式
+          const workflowSettings = settings as WorkflowSettings;
+          const backendWorkflows: Record<string, any> = {};
+          Object.entries(workflowSettings.workflows).forEach(([key, workflow]) => {
+            backendWorkflows[key] = {
+              Name: workflow.name,
+              WorkflowID: workflow.workflow_id,
+              AppID: workflow.app_id,
+              Parameters: workflow.parameters.map((param) => ({
+                Key: param.key,
+                Label: param.label,
+                Type: param.type,
+                Required: param.required,
+                Options: param.options,
+                DefaultValue: param.default_value
+              }))
+            };
+          });
+          
           backendSettings = {
-            ApiKey: settings.apiKey,
-            Workflows: settings.workflows
+            ApiKey: workflowSettings.apiKey,
+            Workflows: backendWorkflows
           };
           await UpdateWorkflowConfig(backendSettings);
           console.log('Saved workflow settings:', settings);
