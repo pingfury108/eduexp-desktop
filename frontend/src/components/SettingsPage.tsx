@@ -85,6 +85,11 @@ export default function SettingsPage() {
   const [showApiKey, setShowApiKey] = useState(false);
   const [apiKeyTesting, setApiKeyTesting] = useState(false);
 
+  // 许可证密钥弹窗状态
+  const [isLicenseModalOpen, setIsLicenseModalOpen] = useState(false);
+  const [licenseKeyInput, setLicenseKeyInput] = useState('');
+  const [licenseKeyTesting, setLicenseKeyTesting] = useState(false);
+
   // 检测API密钥
   const testApiKey = async () => {
     if (!workflowSettings.apiKey.trim()) {
@@ -111,6 +116,47 @@ export default function SettingsPage() {
     }
   };
 
+  // 许可证密钥管理函数
+  const openLicenseModal = () => {
+    setLicenseKeyInput(licenseSettings.licenseKey);
+    setIsLicenseModalOpen(true);
+  };
+
+  const closeLicenseModal = () => {
+    setIsLicenseModalOpen(false);
+    setLicenseKeyInput('');
+    setLicenseKeyTesting(false);
+  };
+
+  const testLicenseKey = async () => {
+    if (!licenseKeyInput.trim()) {
+      alert('请输入许可证密钥');
+      return;
+    }
+
+    setLicenseKeyTesting(true);
+    try {
+      // TODO: 这里可以添加实际的许可证验证API调用
+      // 模拟API调用
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      alert('许可证密钥验证成功！');
+    } catch (error) {
+      alert('许可证密钥验证失败，请检查密钥是否正确');
+    } finally {
+      setLicenseKeyTesting(false);
+    }
+  };
+
+  const saveLicenseKey = () => {
+    if (!licenseKeyInput.trim()) {
+      alert('请输入许可证密钥');
+      return;
+    }
+
+    updateLicenseSetting('licenseKey', licenseKeyInput);
+    closeLicenseModal();
+  };
+
   // 应用主题到页面
   useEffect(() => {
     const htmlElement = document.documentElement;
@@ -120,16 +166,21 @@ export default function SettingsPage() {
   // ESC键关闭模态框
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isWorkflowModalOpen) {
-        closeWorkflowModal();
+      if (e.key === 'Escape') {
+        if (isWorkflowModalOpen) {
+          closeWorkflowModal();
+        }
+        if (isLicenseModalOpen) {
+          closeLicenseModal();
+        }
       }
     };
 
-    if (isWorkflowModalOpen) {
+    if (isWorkflowModalOpen || isLicenseModalOpen) {
       document.addEventListener('keydown', handleEscape);
       return () => document.removeEventListener('keydown', handleEscape);
     }
-  }, [isWorkflowModalOpen]);
+  }, [isWorkflowModalOpen, isLicenseModalOpen]);
 
   // 加载配置数据
   useEffect(() => {
@@ -440,8 +491,6 @@ export default function SettingsPage() {
     setEditingWorkflow({ ...editingWorkflow, parameters: newParameters });
   };
 
-
-
   if (loading) {
     return (
       <div className="flex h-full">
@@ -685,98 +734,29 @@ export default function SettingsPage() {
       </div>
 
       {/* 许可证密钥 */}
-      <div className="form-control py-4 border-b border-base-300">
-        <div className="flex justify-between items-center">
-          <div>
-            <span className="text-base font-medium text-base-content">许可证密钥</span>
+      <div className="py-6">
+        <div className="mb-4">
+          <h4 className="text-lg font-semibold text-base-content mb-2">许可证密钥</h4>
+          <p className="text-sm text-base-content opacity-70">软件授权许可证密钥</p>
+        </div>
+        
+        <div className="flex gap-3 items-center">
+          <div className="flex-1">
+            <input
+              type="password"
+              className="input input-bordered w-full text-base-content"
+              value={licenseSettings.licenseKey}
+              readOnly
+              placeholder={licenseSettings.licenseKey ? "已配置许可证密钥" : "未配置许可证密钥"}
+            />
           </div>
-          <input
-            type="text"
-            className="input input-bordered w-48 text-base-content"
-            value={licenseSettings.licenseKey}
-            onChange={(e) => updateLicenseSetting('licenseKey', e.target.value)}
-            placeholder="输入许可证密钥"
-          />
-        </div>
-      </div>
-
-      {/* 过期日期 */}
-      <div className="form-control py-4 border-b border-base-300">
-        <div className="flex justify-between items-center">
-          <div>
-            <span className="text-base font-medium text-base-content">过期日期</span>
-          </div>
-          <input
-            type="date"
-            className="input input-bordered w-48 text-base-content"
-            value={licenseSettings.expiryDate}
-            onChange={(e) => updateLicenseSetting('expiryDate', e.target.value)}
-          />
-        </div>
-      </div>
-
-      {/* 用户数量限制 */}
-      <div className="form-control py-4 border-b border-base-300">
-        <div className="flex justify-between items-center">
-          <div>
-            <span className="text-base font-medium text-base-content">用户数量限制</span>
-          </div>
-          <input
-            type="number"
-            className="input input-bordered w-48 text-base-content"
-            value={licenseSettings.userLimit}
-            onChange={(e) => updateLicenseSetting('userLimit', parseInt(e.target.value) || 1)}
-            min="1"
-            max="1000"
-          />
-        </div>
-      </div>
-
-      {/* 版本号 */}
-      <div className="form-control py-4 border-b border-base-300">
-        <div className="flex justify-between items-center">
-          <span className="text-base font-medium text-base-content">版本号</span>
-          <span className="font-medium text-base-content">v1.0.0</span>
-        </div>
-      </div>
-
-      {/* 构建日期 */}
-      <div className="form-control py-4 border-b border-base-300">
-        <div className="flex justify-between items-center">
-          <span className="text-base font-medium text-base-content">构建日期</span>
-          <span className="font-medium text-base-content">2024-01-20</span>
-        </div>
-      </div>
-
-      {/* 开发者 */}
-      <div className="form-control py-4 border-b border-base-300">
-        <div className="flex justify-between items-center">
-          <span className="text-base font-medium text-base-content">开发者</span>
-          <span className="font-medium text-base-content">EduExp Team</span>
-        </div>
-      </div>
-
-      {/* 状态 */}
-      <div className="form-control py-4 border-b border-base-300">
-        <div className="flex justify-between items-center">
-          <span className="text-base font-medium text-base-content">状态</span>
-          <span className="font-medium text-base-content">{configInfo.status || '未知'}</span>
-        </div>
-      </div>
-
-      {/* 配置目录 */}
-      <div className="form-control py-4 border-b border-base-300">
-        <div className="flex justify-between items-center">
-          <span className="text-base font-medium text-base-content">配置目录</span>
-          <span className="font-medium text-base-content text-sm">{configInfo.config_dir || '未设置'}</span>
-        </div>
-      </div>
-
-      {/* 配置文件 */}
-      <div className="form-control py-4 border-b border-base-300">
-        <div className="flex justify-between items-center">
-          <span className="text-base font-medium text-base-content">配置文件</span>
-          <span className="font-medium text-base-content text-sm">{configInfo.config_file || '未设置'}</span>
+          
+          <button
+            className="btn btn-primary btn-sm px-6"
+            onClick={openLicenseModal}
+          >
+            {licenseSettings.licenseKey ? '更换密钥' : '添加密钥'}
+          </button>
         </div>
       </div>
     </div>
@@ -1101,6 +1081,79 @@ export default function SettingsPage() {
                 className="btn btn-primary"
               >
                 保存
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 许可证密钥编辑模态框 */}
+      {isLicenseModalOpen && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+          onClick={closeLicenseModal}
+        >
+          <div 
+            className="bg-base-100 rounded-lg p-6 w-[500px]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-xl font-bold text-base-content">
+                {licenseSettings.licenseKey ? '更换许可证密钥' : '添加许可证密钥'}
+              </h3>
+              <button
+                onClick={closeLicenseModal}
+                className="btn btn-sm btn-circle btn-ghost hover:bg-base-300"
+                title="关闭"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="space-y-4 mb-6">
+              <div>
+                <label className="label">
+                  <span className="label-text">许可证密钥</span>
+                </label>
+                <input
+                  type="text"
+                  className="input input-bordered w-full"
+                  value={licenseKeyInput}
+                  onChange={(e) => setLicenseKeyInput(e.target.value)}
+                  placeholder="输入许可证密钥"
+                />
+              </div>
+            </div>
+
+            {/* 操作按钮 */}
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={testLicenseKey}
+                className="btn btn-outline"
+                disabled={licenseKeyTesting}
+              >
+                {licenseKeyTesting ? (
+                  <>
+                    <span className="loading loading-spinner loading-xs"></span>
+                    验证中
+                  </>
+                ) : (
+                  '验证密钥'
+                )}
+              </button>
+              <button
+                onClick={closeLicenseModal}
+                className="btn btn-ghost"
+              >
+                取消
+              </button>
+              <button
+                onClick={saveLicenseKey}
+                className="btn btn-primary"
+              >
+                {licenseSettings.licenseKey ? '更新密钥' : '保存密钥'}
               </button>
             </div>
           </div>
