@@ -2,9 +2,10 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"os/signal"
+	"path/filepath"
+	"runtime"
 	"sync"
 	"syscall"
 )
@@ -15,6 +16,7 @@ type App struct {
 	processManager *ProcessManager // 进程管理器
 	configManager  *ConfigManager  // 配置管理器
 	exitOnce       sync.Once       // 确保退出逻辑只执行一次
+	appDataDir     string          // 应用数据目录
 }
 
 // NewApp creates a new App application struct
@@ -30,10 +32,39 @@ func NewApp() *App {
 		_ = err
 	}
 
+	// 获取应用数据目录
+	app.appDataDir = app.getAppDataDir()
+
 	// 在 Wails 中，主要依赖 OnShutdown 和 OnBeforeClose 钩子
 	// 但仍然保留系统信号监听作为备用
 	go app.setupExitHandler()
 	return app
+}
+
+// getAppDataDir 获取应用数据目录
+func (a *App) getAppDataDir() string {
+	// 获取用户主目录
+	userHomeDir, err := os.UserHomeDir()
+	if err != nil {
+		// 如果获取失败，使用当前目录
+		return "."
+	}
+
+	// 根据操作系统确定数据目录
+	var appDataDir string
+	switch runtime.GOOS {
+	case "windows":
+		// Windows: %APPDATA%\eduexp-desktop
+		appDataDir = filepath.Join(userHomeDir, "AppData", "Roaming", "eduexp-desktop")
+	case "darwin":
+		// macOS: ~/Library/Application Support/eduexp-desktop
+		appDataDir = filepath.Join(userHomeDir, "Library", "Application Support", "eduexp-desktop")
+	default:
+		// Linux/Unix: ~/.local/share/eduexp-desktop
+		appDataDir = filepath.Join(userHomeDir, ".local", "share", "eduexp-desktop")
+	}
+
+	return appDataDir
 }
 
 // startup is called when the app starts. The context is saved
@@ -42,6 +73,49 @@ func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 	// 创建进程管理器
 	a.processManager = NewProcessManager(ctx)
+
+	// 注册新的进程
+	a.registerProcesses()
+}
+
+// getExecutableName 根据操作系统返回可执行文件名
+func (a *App) getExecutableName(baseName string) string {
+	if runtime.GOOS == "windows" {
+		return baseName + ".exe"
+	}
+	return baseName
+}
+
+// registerProcesses 注册应用进程
+func (a *App) registerProcesses() {
+	binDir := filepath.Join(a.appDataDir, "bin")
+
+	// 注册 workflowui 进程
+	workflowuiDataDir := filepath.Join(a.appDataDir, "data", "workflowui")
+	workflowuiExe := a.getExecutableName("workflowui")
+	a.processManager.RegisterProcess("workflowui", &ProcessConfig{
+		Name:    "workflowui",
+		Command: filepath.Join(binDir, workflowuiExe),
+		Args:    []string{},
+		WorkDir: workflowuiDataDir,
+	})
+
+	// 注册 edu-tools 进程
+	eduToolsDataDir := filepath.Join(a.appDataDir, "data", "edu-tools")
+	eduToolsExe := a.getExecutableName("edu-tools")
+	a.processManager.RegisterProcess("edu-tools", &ProcessConfig{
+		Name:    "edu-tools",
+		Command: filepath.Join(binDir, eduToolsExe),
+		Args:    []string{},
+		WorkDir: eduToolsDataDir,
+	})
+
+	// 确保数据目录存在
+	os.MkdirAll(workflowuiDataDir, 0755)
+	os.MkdirAll(eduToolsDataDir, 0755)
+
+	// 确保bin目录存在
+	os.MkdirAll(binDir, 0755)
 }
 
 // shutdown is called when the app is shutting down
@@ -78,6 +152,10 @@ func (a *App) cleanup() {
 	})
 }
 
+// ===============================
+// 进程管理相关接口
+// ===============================
+
 // RegisterProcess 注册进程配置
 func (a *App) RegisterProcess(name string, config *ProcessConfig) {
 	if a.processManager != nil {
@@ -91,6 +169,11 @@ func (a *App) GetRegisteredProcesses() []string {
 		return a.processManager.GetRegisteredProcesses()
 	}
 	return []string{}
+}
+
+// GetRegisteredProcessNames 获取注册的进程名称（新增方法）
+func (a *App) GetRegisteredProcessNames() []string {
+	return a.GetRegisteredProcesses()
 }
 
 // StartProcess 启动指定进程
@@ -133,148 +216,7 @@ func (a *App) GetProcessOutput(processName string) string {
 	return "Process manager not initialized"
 }
 
-// 兼容性方法：保持与原有API的兼容
-// StartGinServer 启动服务（兼容旧接口，默认启动caddy-fileserver）
-func (a *App) StartGinServer(port string) string {
-	return a.StartProcess("caddy-fileserver", "--listen", "0.0.0.0:"+port)
-}
-
-// StopGinServer 停止服务（兼容旧接口）
-func (a *App) StopGinServer() string {
-	return a.StopProcess("caddy-fileserver")
-}
-
-// GetServerStatus 获取状态（兼容旧接口）
-func (a *App) GetServerStatus() string {
-	return a.GetProcessStatus("caddy-fileserver")
-}
-
-// GetServerOutput 获取输出日志（兼容旧接口）
-func (a *App) GetServerOutput() string {
-	return a.GetProcessOutput("caddy-fileserver")
-}
-
-// ===============================
-// 配置管理相关接口
-// ===============================
-
-// GetConfig 获取完整配置
-func (a *App) GetConfig() *Config {
-	if a.configManager != nil {
-		return a.configManager.GetConfig()
-	}
-	return GetDefaultConfig()
-}
-
-// GetGlobalConfig 获取全局配置
-func (a *App) GetGlobalConfig() GlobalConfig {
-	if a.configManager != nil {
-		return a.configManager.GetConfig().Global
-	}
-	return GetDefaultConfig().Global
-}
-
-// UpdateGlobalConfig 更新全局配置
-func (a *App) UpdateGlobalConfig(config GlobalConfig) string {
-	if a.configManager == nil {
-		return "Config manager not initialized"
-	}
-
-	err := a.configManager.UpdateGlobalConfig(config)
-	if err != nil {
-		return fmt.Sprintf("Failed to update global config: %v", err)
-	}
-	return "Global config updated successfully"
-}
-
-// GetEduExpConfig 获取EduExp配置
-func (a *App) GetEduExpConfig() EduExpConfig {
-	if a.configManager != nil {
-		return a.configManager.GetConfig().EduExp
-	}
-	return GetDefaultConfig().EduExp
-}
-
-// UpdateEduExpConfig 更新EduExp配置
-func (a *App) UpdateEduExpConfig(config EduExpConfig) string {
-	if a.configManager == nil {
-		return "Config manager not initialized"
-	}
-
-	err := a.configManager.UpdateEduExpConfig(config)
-	if err != nil {
-		return fmt.Sprintf("Failed to update EduExp config: %v", err)
-	}
-	return "EduExp config updated successfully"
-}
-
-// GetWorkflowConfig 获取工作流配置
-func (a *App) GetWorkflowConfig() WorkflowConfig {
-	if a.configManager != nil {
-		return a.configManager.GetConfig().Workflow
-	}
-	return GetDefaultConfig().Workflow
-}
-
-// UpdateWorkflowConfig 更新工作流配置
-func (a *App) UpdateWorkflowConfig(config WorkflowConfig) string {
-	if a.configManager == nil {
-		return "Config manager not initialized"
-	}
-
-	err := a.configManager.UpdateWorkflowConfig(config)
-	if err != nil {
-		return fmt.Sprintf("Failed to update workflow config: %v", err)
-	}
-	return "Workflow config updated successfully"
-}
-
-// GetLicenseConfig 获取许可配置
-func (a *App) GetLicenseConfig() LicenseConfig {
-	if a.configManager != nil {
-		return a.configManager.GetConfig().License
-	}
-	return GetDefaultConfig().License
-}
-
-// UpdateLicenseConfig 更新许可配置
-func (a *App) UpdateLicenseConfig(config LicenseConfig) string {
-	if a.configManager == nil {
-		return "Config manager not initialized"
-	}
-
-	err := a.configManager.UpdateLicenseConfig(config)
-	if err != nil {
-		return fmt.Sprintf("Failed to update license config: %v", err)
-	}
-	return "License config updated successfully"
-}
-
-// ResetConfig 重置配置为默认值
-func (a *App) ResetConfig() string {
-	if a.configManager == nil {
-		return "Config manager not initialized"
-	}
-
-	err := a.configManager.ResetToDefault()
-	if err != nil {
-		return fmt.Sprintf("Failed to reset config: %v", err)
-	}
-	return "Config reset to default successfully"
-}
-
-// GetConfigInfo 获取配置信息
-func (a *App) GetConfigInfo() map[string]string {
-	info := make(map[string]string)
-
-	if a.configManager == nil {
-		info["status"] = "Config manager not initialized"
-		return info
-	}
-
-	info["config_dir"] = a.configManager.GetConfigDir()
-	info["config_file"] = a.configManager.GetConfigFile()
-	info["status"] = "Initialized"
-
-	return info
+// GetAppDataDir 获取应用数据目录
+func (a *App) GetAppDataDir() string {
+	return a.appDataDir
 }

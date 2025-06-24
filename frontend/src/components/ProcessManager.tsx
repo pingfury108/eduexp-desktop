@@ -1,28 +1,197 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { 
+  GetRegisteredProcesses,
+  GetAllProcessStatus,
+  StartProcess, 
+  StopProcess, 
+  GetProcessStatus, 
+  GetProcessOutput,
+  StartWorkflowUI,
+  GetEduExpConfig,
+  UpdateEduExpConfig
+} from '../../wailsjs/go/main/App';
 
-interface WorkflowService {
+interface ProcessInfo {
+  name: string;
+  displayName: string;
   status: 'running' | 'stopped' | 'error';
-  port: string;
   startTime?: string;
+  hasSpecialStart?: boolean; // 是否有特殊启动方法
 }
 
 export default function ProcessManager() {
-  // 工作流服务状态
-  const [workflowService, setWorkflowService] = useState<WorkflowService>({
-    status: 'stopped',
-    port: '8081'
-  });
-  
-  const [isPortModalOpen, setIsPortModalOpen] = useState(false);
+  const [processes, setProcesses] = useState<ProcessInfo[]>([]);
+  const [selectedProcess, setSelectedProcess] = useState<string>('');
   const [isLogModalOpen, setIsLogModalOpen] = useState(false);
-  const [tempPort, setTempPort] = useState('8081');
-  const [logs, setLogs] = useState<string[]>([
-    '2024-01-15 10:30:00 - 工作流服务初始化',
-    '2024-01-15 10:30:01 - 正在加载配置文件',
-    '2024-01-15 10:30:02 - 服务启动成功，监听端口 8081',
-    '2024-01-15 10:30:03 - 等待工作流请求...'
-  ]);
+  const [logs, setLogs] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [globalPort, setGlobalPort] = useState('8081');
 
+  // 进程显示名称映射
+  const getDisplayName = (processName: string): string => {
+    const nameMap: Record<string, string> = {
+      'workflowui': 'WorkflowUI 服务',
+      'edu-tools': 'EduTools 工具',
+      'caddy-fileserver': 'Caddy 文件服务器'
+    };
+    return nameMap[processName] || processName;
+  };
+
+  // 检查是否有特殊启动方法
+  const hasSpecialStartMethod = (processName: string): boolean => {
+    return processName === 'workflowui';
+  };
+
+  // 加载已注册的进程列表
+  const loadProcesses = async () => {
+    try {
+      const processNames = await GetRegisteredProcesses();
+      const processInfos: ProcessInfo[] = processNames.map(name => ({
+        name,
+        displayName: getDisplayName(name),
+        status: 'stopped' as const,
+        hasSpecialStart: hasSpecialStartMethod(name)
+      }));
+      setProcesses(processInfos);
+      
+      // 设置默认选中第一个进程
+      if (processInfos.length > 0 && !selectedProcess) {
+        setSelectedProcess(processInfos[0].name);
+      }
+    } catch (error) {
+      console.error('Failed to load processes:', error);
+    }
+  };
+
+  // 检查所有进程状态
+  const checkAllProcessStatus = async () => {
+    try {
+      const statusMap = await GetAllProcessStatus();
+      setProcesses(prev => prev.map(process => {
+        const statusText = statusMap[process.name] || 'unknown';
+        let status: 'running' | 'stopped' | 'error' = 'stopped';
+        
+        if (statusText.includes('running') || statusText.includes('started')) {
+          status = 'running';
+        } else if (statusText.includes('not running') || statusText.includes('stopped')) {
+          status = 'stopped';
+        } else if (statusText.includes('error') || statusText.includes('failed')) {
+          status = 'error';
+        }
+        
+        return { ...process, status };
+      }));
+    } catch (error) {
+      console.error('Failed to check process status:', error);
+    }
+  };
+
+  // 获取指定进程的日志
+  const fetchProcessLogs = async (processName: string) => {
+    try {
+      const output = await GetProcessOutput(processName);
+      if (output && output.trim()) {
+        const logLines = output.split('\n').filter((line: string) => line.trim());
+        setLogs(logLines);
+      } else {
+        setLogs([]);
+      }
+    } catch (error) {
+      console.error('Failed to fetch logs:', error);
+      setLogs([]);
+    }
+  };
+
+  // 加载全局端口配置
+  const loadGlobalPort = async () => {
+    try {
+      const eduExpConfig = await GetEduExpConfig();
+      if (eduExpConfig && eduExpConfig.ServerPort) {
+        setGlobalPort(eduExpConfig.ServerPort);
+      }
+    } catch (error) {
+      console.error('Failed to load global port:', error);
+    }
+  };
+
+  // 初始化和定期检查
+  useEffect(() => {
+    loadProcesses();
+    loadGlobalPort();
+    checkAllProcessStatus();
+    
+    const statusInterval = setInterval(checkAllProcessStatus, 3000); // 每3秒检查状态
+    return () => clearInterval(statusInterval);
+  }, []);
+
+  // 启动进程
+  const handleStartProcess = async (processName: string) => {
+    setIsLoading(true);
+    try {
+      let result: string;
+      
+      if (processName === 'workflowui') {
+        // WorkflowUI 使用特殊启动方法
+        result = await StartWorkflowUI([]);
+      } else {
+        // 其他进程使用通用启动方法
+        result = await StartProcess(processName, []);
+      }
+      
+      if (result.includes('successfully') || result.includes('started')) {
+        // 更新本地状态
+        setProcesses(prev => prev.map(p => 
+          p.name === processName 
+            ? { ...p, status: 'running', startTime: new Date().toLocaleString('zh-CN') }
+            : p
+        ));
+        
+        // 立即检查状态
+        setTimeout(checkAllProcessStatus, 1000);
+      } else {
+        console.error(`Failed to start ${processName}:`, result);
+      }
+    } catch (error) {
+      console.error(`Error starting ${processName}:`, error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // 停止进程
+  const handleStopProcess = async (processName: string) => {
+    setIsLoading(true);
+    try {
+      const result = await StopProcess(processName);
+      
+      if (result.includes('stopped') || result.includes('successfully')) {
+        // 更新本地状态
+        setProcesses(prev => prev.map(p => 
+          p.name === processName 
+            ? { ...p, status: 'stopped', startTime: undefined }
+            : p
+        ));
+        
+        // 立即检查状态
+        setTimeout(checkAllProcessStatus, 1000);
+      } else {
+        console.error(`Failed to stop ${processName}:`, result);
+      }
+    } catch (error) {
+      console.error(`Error stopping ${processName}:`, error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // 打开日志模态框
+  const openLogModal = (processName: string) => {
+    setSelectedProcess(processName);
+    setIsLogModalOpen(true);
+    fetchProcessLogs(processName);
+  };
+
+  // 获取状态样式
   const getStatusBadgeClass = (status: string) => {
     switch (status) {
       case 'running':
@@ -49,205 +218,228 @@ export default function ProcessManager() {
     }
   };
 
-  // 工作流服务管理
-  const handleStartService = () => {
-    // TODO: 调用后端API启动工作流服务
-    setWorkflowService({
-      ...workflowService,
-      status: 'running',
-      startTime: new Date().toLocaleString('zh-CN')
-    });
-    
-    // 添加启动日志
-    const timestamp = new Date().toLocaleString('zh-CN');
-    setLogs(prev => [...prev, `${timestamp} - 工作流服务启动成功`]);
-  };
-
-  const handleStopService = () => {
-    // TODO: 调用后端API停止工作流服务
-    setWorkflowService({
-      ...workflowService,
-      status: 'stopped',
-      startTime: undefined
-    });
-    
-    // 添加停止日志
-    const timestamp = new Date().toLocaleString('zh-CN');
-    setLogs(prev => [...prev, `${timestamp} - 工作流服务已停止`]);
-  };
-
-  const handleUpdatePort = () => {
-    setWorkflowService({
-      ...workflowService,
-      port: tempPort
-    });
-    setIsPortModalOpen(false);
-    
-    // 添加端口变更日志
-    const timestamp = new Date().toLocaleString('zh-CN');
-    setLogs(prev => [...prev, `${timestamp} - 端口已变更为 ${tempPort}`]);
-  };
-
-  const openPortModal = () => {
-    setTempPort(workflowService.port);
-    setIsPortModalOpen(true);
-  };
-
-  const openLogModal = () => {
-    setIsLogModalOpen(true);
+  // 清空日志
+  const clearLogs = () => {
+    setLogs([]);
   };
 
   return (
     <>
-      {/* 工作流服务状态卡片 */}
+      {/* 进程管理主界面 */}
       <div className="card bg-base-100 shadow-xl mb-8">
         <div className="card-body">
+          <h2 className="card-title text-xl mb-4">
+            <svg className="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+            进程管理
+          </h2>
+
+          {/* 进程状态总览 */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
             <div className="stat bg-base-200 rounded-lg">
-              <div className="stat-title">服务端口</div>
-              <div className="stat-value text-2xl">{workflowService.port}</div>
-              <div className="stat-actions">
-                <button 
-                  className="btn btn-sm btn-outline"
-                  onClick={openPortModal}
-                >
-                  修改端口
-                </button>
-              </div>
+              <div className="stat-title">已注册进程</div>
+              <div className="stat-value text-2xl">{processes.length}</div>
+              <div className="stat-desc">个服务进程</div>
             </div>
             
             <div className="stat bg-base-200 rounded-lg">
-              <div className="stat-title">运行状态</div>
-              <div className="stat-value text-2xl">
-                <span className={`text-${workflowService.status === 'running' ? 'success' : 'warning'}`}>
-                  {getStatusText(workflowService.status)}
-                </span>
+              <div className="stat-title">运行中进程</div>
+              <div className="stat-value text-2xl text-success">
+                {processes.filter(p => p.status === 'running').length}
               </div>
+              <div className="stat-desc">个进程正在运行</div>
             </div>
             
             <div className="stat bg-base-200 rounded-lg">
-              <div className="stat-title">日志查看</div>
-              <div className="stat-value text-lg">
-                <button 
-                  className="btn btn-outline btn-sm"
-                  onClick={openLogModal}
-                >
-                  查看日志
-                </button>
-              </div>
+              <div className="stat-title">全局配置</div>
+              <div className="stat-value text-lg">端口: {globalPort}</div>
+              <div className="stat-desc">默认服务端口</div>
             </div>
           </div>
 
-          <div className="flex gap-4">
-            {workflowService.status === 'running' ? (
-              <button
-                className="btn btn-warning"
-                onClick={handleStopService}
-              >
-                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 10l6 6m0-6l-6 6" />
-                </svg>
-                停止服务
-              </button>
-            ) : (
-              <button
-                className="btn btn-success"
-                onClick={handleStartService}
-              >
-                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h1m4 0h1m-6 4h8m2-10v18a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                </svg>
-                启动服务
-              </button>
-            )}
+          {/* 进程列表 */}
+          {processes.length === 0 ? (
+            <div className="text-center py-8">
+              <div className="text-4xl mb-4">🔧</div>
+              <p className="text-base-content opacity-70">暂无注册的进程</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="table table-zebra w-full">
+                <thead>
+                  <tr>
+                    <th>进程名称</th>
+                    <th>状态</th>
+                    <th>启动时间</th>
+                    <th>操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {processes.map((process) => (
+                    <tr key={process.name} className="hover">
+                      <td>
+                        <div className="flex items-center gap-3">
+                          <div className="avatar placeholder">
+                            <div className="bg-neutral text-neutral-content rounded-full w-8 h-8">
+                              <span className="text-xs">{process.displayName.charAt(0)}</span>
+                            </div>
+                          </div>
+                          <div>
+                            <div className="font-medium text-base-content">{process.displayName}</div>
+                            <div className="text-xs text-base-content opacity-50">{process.name}</div>
+                            {process.hasSpecialStart && (
+                              <div className="badge badge-outline badge-xs">特殊配置</div>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+                      <td>
+                        <div className="flex items-center gap-2">
+                          <span className={getStatusBadgeClass(process.status)}>
+                            {getStatusText(process.status)}
+                          </span>
+                          {isLoading && <span className="loading loading-spinner loading-sm"></span>}
+                        </div>
+                      </td>
+                      <td>
+                        {process.startTime ? (
+                          <span className="text-sm text-base-content opacity-70">{process.startTime}</span>
+                        ) : (
+                          <span className="text-base-content opacity-50">未启动</span>
+                        )}
+                      </td>
+                      <td>
+                        <div className="flex gap-2">
+                          {process.status === 'running' ? (
+                            <button
+                              className="btn btn-warning btn-sm"
+                              onClick={() => handleStopProcess(process.name)}
+                              disabled={isLoading}
+                            >
+                              停止
+                            </button>
+                          ) : (
+                            <button
+                              className="btn btn-success btn-sm"
+                              onClick={() => handleStartProcess(process.name)}
+                              disabled={isLoading}
+                            >
+                              启动
+                            </button>
+                          )}
+                          
+                          <button
+                            className="btn btn-outline btn-sm"
+                            onClick={() => openLogModal(process.name)}
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                            日志
+                          </button>
+
+                          {process.name === 'workflowui' && process.status === 'running' && (
+                            <button
+                              className="btn btn-info btn-sm"
+                              onClick={() => window.open(`http://localhost:${globalPort}`, '_blank')}
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                              </svg>
+                              访问
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* 全局操作按钮 */}
+          <div className="flex gap-4 mt-6 flex-wrap">
+            <button
+              className="btn btn-info btn-outline"
+              onClick={checkAllProcessStatus}
+              disabled={isLoading}
+            >
+              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              刷新状态
+            </button>
             
             <button
               className="btn btn-outline"
-              onClick={() => window.open(`http://localhost:${workflowService.port}`, '_blank')}
-              disabled={workflowService.status !== 'running'}
+              onClick={loadProcesses}
+              disabled={isLoading}
             >
               <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
               </svg>
-              访问服务
+              重新加载进程列表
             </button>
           </div>
         </div>
       </div>
 
-      {/* 端口配置模态框 */}
-      {isPortModalOpen && (
-        <div className="modal modal-open">
-          <div className="modal-box">
-            <h3 className="font-bold text-lg mb-4">修改服务端口</h3>
-            
-            <div className="form-control mb-4">
-              <label className="label">
-                <span className="label-text font-medium text-base-content">端口号</span>
-              </label>
-              <input
-                type="number"
-                className="input input-bordered w-full"
-                value={tempPort}
-                onChange={(e) => setTempPort(e.target.value)}
-                placeholder="输入端口号"
-                min="1024"
-                max="65535"
-              />
-              <label className="label">
-                <span className="label-text-alt text-base-content opacity-70">端口范围: 1024-65535</span>
-              </label>
-            </div>
-            
-            <div className="modal-action">
-              <button 
-                className="btn btn-outline text-base-content"
-                onClick={() => setIsPortModalOpen(false)}
-              >
-                取消
-              </button>
-              <button 
-                className="btn btn-primary"
-                onClick={handleUpdatePort}
-                disabled={!tempPort || parseInt(tempPort) < 1024 || parseInt(tempPort) > 65535}
-              >
-                确认
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* 日志查看模态框 */}
       {isLogModalOpen && (
         <div className="modal modal-open">
-          <div className="modal-box max-w-4xl h-96">
+          <div className="modal-box max-w-6xl h-96">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="font-bold text-lg">工作流服务日志</h3>
-              <button 
-                className="btn btn-sm btn-circle btn-ghost"
-                onClick={() => setIsLogModalOpen(false)}
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
+              <h3 className="font-bold text-lg">
+                {selectedProcess && getDisplayName(selectedProcess)} - 进程日志
+              </h3>
+              <div className="flex gap-2">
+                <button 
+                  className="btn btn-sm btn-outline"
+                  onClick={() => fetchProcessLogs(selectedProcess)}
+                >
+                  <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  刷新
+                </button>
+                <button 
+                  className="btn btn-sm btn-circle btn-ghost"
+                  onClick={() => setIsLogModalOpen(false)}
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
             </div>
             
             <div className="bg-base-300 rounded-lg p-4 font-mono text-sm overflow-y-auto h-64">
-              {logs.map((log, index) => (
-                <div key={index} className="mb-1 text-base-content">
-                  {log}
+              {logs.length === 0 ? (
+                <div className="text-base-content opacity-50 text-center py-8">
+                  <svg className="w-12 h-12 mx-auto mb-4 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  暂无日志输出
                 </div>
-              ))}
+              ) : (
+                logs.map((log, index) => (
+                  <div key={index} className="mb-1 text-base-content whitespace-pre-wrap">
+                    <span className="text-base-content opacity-60">{(index + 1).toString().padStart(3, '0')} |</span> {log}
+                  </div>
+                ))
+              )}
             </div>
             
             <div className="modal-action">
               <button 
                 className="btn btn-outline"
-                onClick={() => setLogs([])}
+                onClick={clearLogs}
               >
+                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
                 清空日志
               </button>
               <button 

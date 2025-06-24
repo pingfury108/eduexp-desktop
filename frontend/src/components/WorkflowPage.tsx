@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { GetWorkflowConfig } from '../../wailsjs/go/main/App';
-import ProcessManager from './ProcessManager';
+import WorkflowProcessManager from './WorkflowProcessManager';
 
 interface WorkflowItem {
   id: string;
@@ -24,7 +24,7 @@ export default function WorkflowPage() {
         const workflowConfig = await GetWorkflowConfig();
         
         const workflowItems: WorkflowItem[] = [];
-        if (workflowConfig.Workflows) {
+        if (workflowConfig && workflowConfig.Workflows) {
           Object.entries(workflowConfig.Workflows).forEach(([key, workflow]) => {
             workflowItems.push({
               id: key,
@@ -62,8 +62,8 @@ export default function WorkflowPage() {
   return (
     <div className="p-6">
       <div className="max-w-6xl">
-        {/* 进程管理组件 */}
-        <ProcessManager />
+        {/* WorkflowUI 进程管理组件 */}
+        <WorkflowProcessManager />
 
         {/* 服务功能列表 */}
         <div className="card bg-base-100 shadow-xl">

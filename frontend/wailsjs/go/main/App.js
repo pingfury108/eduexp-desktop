@@ -6,8 +6,12 @@ export function GetAllProcessStatus() {
   return window['go']['main']['App']['GetAllProcessStatus']();
 }
 
-export function GetConfig() {
-  return window['go']['main']['App']['GetConfig']();
+export function GetAppDataDir() {
+  return window['go']['main']['App']['GetAppDataDir']();
+}
+
+export function GetConfigFilePath() {
+  return window['go']['main']['App']['GetConfigFilePath']();
 }
 
 export function GetConfigInfo() {
@@ -16,6 +20,18 @@ export function GetConfigInfo() {
 
 export function GetEduExpConfig() {
   return window['go']['main']['App']['GetEduExpConfig']();
+}
+
+export function GetEduToolsOutput() {
+  return window['go']['main']['App']['GetEduToolsOutput']();
+}
+
+export function GetEduToolsStatus() {
+  return window['go']['main']['App']['GetEduToolsStatus']();
+}
+
+export function GetFullConfig() {
+  return window['go']['main']['App']['GetFullConfig']();
 }
 
 export function GetGlobalConfig() {
@@ -34,6 +50,10 @@ export function GetProcessStatus(arg1) {
   return window['go']['main']['App']['GetProcessStatus'](arg1);
 }
 
+export function GetRegisteredProcessNames() {
+  return window['go']['main']['App']['GetRegisteredProcessNames']();
+}
+
 export function GetRegisteredProcesses() {
   return window['go']['main']['App']['GetRegisteredProcesses']();
 }
@@ -50,12 +70,24 @@ export function GetWorkflowConfig() {
   return window['go']['main']['App']['GetWorkflowConfig']();
 }
 
+export function GetWorkflowUIOutput() {
+  return window['go']['main']['App']['GetWorkflowUIOutput']();
+}
+
+export function GetWorkflowUIStatus() {
+  return window['go']['main']['App']['GetWorkflowUIStatus']();
+}
+
 export function RegisterProcess(arg1, arg2) {
   return window['go']['main']['App']['RegisterProcess'](arg1, arg2);
 }
 
-export function ResetConfig() {
-  return window['go']['main']['App']['ResetConfig']();
+export function ResetConfigToDefault() {
+  return window['go']['main']['App']['ResetConfigToDefault']();
+}
+
+export function StartEduTools(arg1) {
+  return window['go']['main']['App']['StartEduTools'](arg1);
 }
 
 export function StartGinServer(arg1) {
@@ -66,12 +98,24 @@ export function StartProcess(arg1, arg2) {
   return window['go']['main']['App']['StartProcess'](arg1, arg2);
 }
 
+export function StartWorkflowUI(arg1) {
+  return window['go']['main']['App']['StartWorkflowUI'](arg1);
+}
+
+export function StopEduTools() {
+  return window['go']['main']['App']['StopEduTools']();
+}
+
 export function StopGinServer() {
   return window['go']['main']['App']['StopGinServer']();
 }
 
 export function StopProcess(arg1) {
   return window['go']['main']['App']['StopProcess'](arg1);
+}
+
+export function StopWorkflowUI() {
+  return window['go']['main']['App']['StopWorkflowUI']();
 }
 
 export function UpdateEduExpConfig(arg1) {

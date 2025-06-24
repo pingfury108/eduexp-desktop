@@ -4,11 +4,19 @@ import {main} from '../models';
 
 export function GetAllProcessStatus():Promise<Record<string, string>>;
 
-export function GetConfig():Promise<main.Config>;
+export function GetAppDataDir():Promise<string>;
+
+export function GetConfigFilePath():Promise<string>;
 
 export function GetConfigInfo():Promise<Record<string, string>>;
 
 export function GetEduExpConfig():Promise<main.EduExpConfig>;
+
+export function GetEduToolsOutput():Promise<string>;
+
+export function GetEduToolsStatus():Promise<string>;
+
+export function GetFullConfig():Promise<main.Config>;
 
 export function GetGlobalConfig():Promise<main.GlobalConfig>;
 
@@ -18,6 +26,8 @@ export function GetProcessOutput(arg1:string):Promise<string>;
 
 export function GetProcessStatus(arg1:string):Promise<string>;
 
+export function GetRegisteredProcessNames():Promise<Array<string>>;
+
 export function GetRegisteredProcesses():Promise<Array<string>>;
 
 export function GetServerOutput():Promise<string>;
@@ -26,17 +36,29 @@ export function GetServerStatus():Promise<string>;
 
 export function GetWorkflowConfig():Promise<main.WorkflowConfig>;
 
+export function GetWorkflowUIOutput():Promise<string>;
+
+export function GetWorkflowUIStatus():Promise<string>;
+
 export function RegisterProcess(arg1:string,arg2:main.ProcessConfig):Promise<void>;
 
-export function ResetConfig():Promise<string>;
+export function ResetConfigToDefault():Promise<string>;
+
+export function StartEduTools(arg1:Array<string>):Promise<string>;
 
 export function StartGinServer(arg1:string):Promise<string>;
 
 export function StartProcess(arg1:string,arg2:Array<string>):Promise<string>;
 
+export function StartWorkflowUI(arg1:Array<string>):Promise<string>;
+
+export function StopEduTools():Promise<string>;
+
 export function StopGinServer():Promise<string>;
 
 export function StopProcess(arg1:string):Promise<string>;
+
+export function StopWorkflowUI():Promise<string>;
 
 export function UpdateEduExpConfig(arg1:main.EduExpConfig):Promise<string>;
 
