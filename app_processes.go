@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // ===============================
@@ -23,15 +24,15 @@ type CozeConfig struct {
 }
 
 // StartWorkflowUI 启动 WorkflowUI 进程
-func (a *App) StartWorkflowUI(extraArgs ...string) string {
+func (a *App) StartWorkflowUI(extraArgs []string) string {
 	// 从配置管理器获取配置
 	if a.configManager == nil {
-		return "Configuration manager not initialized"
+		return "ERROR: Configuration manager not initialized"
 	}
 
 	config := a.configManager.GetConfig()
 	if config == nil {
-		return "Failed to get configuration"
+		return "ERROR: Failed to get configuration - please check your configuration file"
 	}
 
 	// 获取 workflowui 的数据目录
@@ -39,13 +40,21 @@ func (a *App) StartWorkflowUI(extraArgs ...string) string {
 
 	// 确保数据目录存在
 	if err := os.MkdirAll(workflowuiDataDir, 0755); err != nil {
-		return fmt.Sprintf("Failed to create workflowui data directory: %v", err)
+		return fmt.Sprintf("ERROR: Failed to create workflowui data directory '%s': %v", workflowuiDataDir, err)
 	}
 
 	// 生成 config.json 文件
 	configFile := filepath.Join(workflowuiDataDir, "config.json")
 	if err := a.generateWorkflowUIConfig(configFile, config); err != nil {
-		return fmt.Sprintf("Failed to generate config.json: %v", err)
+		return fmt.Sprintf("ERROR: Failed to generate config.json file '%s': %v", configFile, err)
+	}
+
+	// 检查 workflowui 可执行文件是否存在
+	binDir := filepath.Join(a.appDataDir, "bin")
+	workflowuiExe := a.getExecutableName("workflowui")
+	workflowuiPath := filepath.Join(binDir, workflowuiExe)
+	if _, err := os.Stat(workflowuiPath); os.IsNotExist(err) {
+		return fmt.Sprintf("ERROR: WorkflowUI executable not found at '%s'. Please ensure the workflowui binary is installed in the bin directory", workflowuiPath)
 	}
 
 	// 构建启动参数
@@ -61,7 +70,17 @@ func (a *App) StartWorkflowUI(extraArgs ...string) string {
 	// 添加额外参数
 	args = append(args, extraArgs...)
 
-	return a.StartProcess("workflowui", args...)
+	// 启动进程并返回结果
+	result := a.StartProcess("workflowui", args...)
+
+	// 如果启动失败，添加更多调试信息
+	if !strings.Contains(result, "successfully") {
+		debugInfo := fmt.Sprintf("\nDEBUG INFO:\n- Executable: %s\n- Working Directory: %s\n- Config File: %s\n- Arguments: %v",
+			workflowuiPath, workflowuiDataDir, configFile, args)
+		result += debugInfo
+	}
+
+	return result
 }
 
 // generateWorkflowUIConfig 生成 WorkflowUI 的配置文件
@@ -114,8 +133,32 @@ func (a *App) GetWorkflowUIOutput() string {
 }
 
 // StartEduTools 启动 EduTools 进程
-func (a *App) StartEduTools(extraArgs ...string) string {
-	return a.StartProcess("edu-tools", extraArgs...)
+func (a *App) StartEduTools(extraArgs []string) string {
+	// 检查 edu-tools 可执行文件是否存在
+	binDir := filepath.Join(a.appDataDir, "bin")
+	eduToolsExe := a.getExecutableName("edu-tools")
+	eduToolsPath := filepath.Join(binDir, eduToolsExe)
+	if _, err := os.Stat(eduToolsPath); os.IsNotExist(err) {
+		return fmt.Sprintf("ERROR: EduTools executable not found at '%s'. Please ensure the edu-tools binary is installed in the bin directory", eduToolsPath)
+	}
+
+	// 确保数据目录存在
+	eduToolsDataDir := filepath.Join(a.appDataDir, "data", "edu-tools")
+	if err := os.MkdirAll(eduToolsDataDir, 0755); err != nil {
+		return fmt.Sprintf("ERROR: Failed to create edu-tools data directory '%s': %v", eduToolsDataDir, err)
+	}
+
+	// 启动进程并返回结果
+	result := a.StartProcess("edu-tools", extraArgs...)
+
+	// 如果启动失败，添加更多调试信息
+	if !strings.Contains(result, "successfully") {
+		debugInfo := fmt.Sprintf("\nDEBUG INFO:\n- Executable: %s\n- Working Directory: %s\n- Arguments: %v",
+			eduToolsPath, eduToolsDataDir, extraArgs)
+		result += debugInfo
+	}
+
+	return result
 }
 
 // StopEduTools 停止 EduTools 进程

@@ -109,8 +109,15 @@ func (pm *ProcessManager) StartProcess(processName string, extraArgs ...string) 
 	}
 
 	// 捕获标准输出和错误
-	stdoutPipe, _ := process.cmd.StdoutPipe()
-	stderrPipe, _ := process.cmd.StderrPipe()
+	stdoutPipe, err := process.cmd.StdoutPipe()
+	if err != nil {
+		return fmt.Sprintf("Failed to create stdout pipe for process '%s': %v", processName, err)
+	}
+
+	stderrPipe, err := process.cmd.StderrPipe()
+	if err != nil {
+		return fmt.Sprintf("Failed to create stderr pipe for process '%s': %v", processName, err)
+	}
 
 	go func() {
 		scanner := bufio.NewScanner(stdoutPipe)
@@ -130,16 +137,32 @@ func (pm *ProcessManager) StartProcess(processName string, extraArgs ...string) 
 	}()
 
 	if err := process.cmd.Start(); err != nil {
-		return fmt.Sprintf("Failed to start process '%s': %v", processName, err)
+		// 记录详细的启动错误信息
+		errorMsg := fmt.Sprintf("Failed to start process '%s': %v", processName, err)
+		process.mu.Lock()
+		process.output += "[STARTUP_ERROR] " + errorMsg + "\n"
+		process.mu.Unlock()
+		return errorMsg
 	}
 
 	process.running = true
 
 	// 监控子进程状态
 	go func() {
-		process.cmd.Wait()
+		err := process.cmd.Wait()
 		process.mu.Lock()
 		process.running = false
+		if err != nil {
+			// 记录进程退出时的错误信息
+			if exitError, ok := err.(*exec.ExitError); ok {
+				process.output += fmt.Sprintf("[PROCESS_EXIT_ERROR] Process '%s' exited with error: %v, exit code: %d\n",
+					processName, err, exitError.ExitCode())
+			} else {
+				process.output += fmt.Sprintf("[PROCESS_EXIT_ERROR] Process '%s' exited with error: %v\n", processName, err)
+			}
+		} else {
+			process.output += fmt.Sprintf("[PROCESS_EXIT] Process '%s' exited normally\n", processName)
+		}
 		process.mu.Unlock()
 	}()
 

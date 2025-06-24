@@ -23,6 +23,9 @@ export default function ProcessManager() {
   const [processes, setProcesses] = useState<ProcessInfo[]>([]);
   const [selectedProcess, setSelectedProcess] = useState<string>('');
   const [isLogModalOpen, setIsLogModalOpen] = useState(false);
+  const [isErrorModalOpen, setIsErrorModalOpen] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [errorProcessName, setErrorProcessName] = useState('');
   const [logs, setLogs] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [globalPort, setGlobalPort] = useState('8081');
@@ -149,9 +152,32 @@ export default function ProcessManager() {
         // 立即检查状态
         setTimeout(checkAllProcessStatus, 1000);
       } else {
+        // 启动失败，更新状态为错误
+        setProcesses(prev => prev.map(p => 
+          p.name === processName 
+            ? { ...p, status: 'error', startTime: undefined }
+            : p
+        ));
+        
+        // 显示错误信息
+        const errorMsg = result.startsWith('ERROR:') ? result : `启动失败: ${result}`;
+        setErrorMessage(errorMsg);
+        setErrorProcessName(processName);
+        setIsErrorModalOpen(true);
+        
         console.error(`Failed to start ${processName}:`, result);
       }
     } catch (error) {
+      // 异常情况，更新状态为错误
+      setProcesses(prev => prev.map(p => 
+        p.name === processName 
+          ? { ...p, status: 'error', startTime: undefined }
+          : p
+      ));
+      
+      setErrorMessage(`启动 ${processName} 时发生异常: ${error}`);
+      setErrorProcessName(processName);
+      setIsErrorModalOpen(true);
       console.error(`Error starting ${processName}:`, error);
     } finally {
       setIsLoading(false);
@@ -385,6 +411,83 @@ export default function ProcessManager() {
           </div>
         </div>
       </div>
+
+      {/* 错误信息弹窗 */}
+      {isErrorModalOpen && (
+        <div className="modal modal-open">
+          <div className="modal-box">
+            <div className="flex items-center gap-4 mb-4">
+              <div className="flex-shrink-0">
+                <svg className="w-8 h-8 text-error" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.5 0L4.268 19.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
+              </div>
+              <div>
+                <h3 className="font-bold text-lg text-error">进程启动失败</h3>
+                <p className="text-sm opacity-70">
+                  {errorProcessName && getDisplayName(errorProcessName)} 进程启动时遇到错误
+                </p>
+              </div>
+            </div>
+            
+            <div className="bg-base-200 rounded-lg p-4 mb-4">
+              <h4 className="font-semibold text-sm mb-2">错误详情：</h4>
+              <div className="text-sm font-mono whitespace-pre-wrap break-words max-h-60 overflow-y-auto">
+                {errorMessage}
+              </div>
+            </div>
+            
+            <div className="flex gap-2 text-sm opacity-70 mb-4">
+              <svg className="w-4 h-4 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <div>
+                <p>请检查以下可能的原因：</p>
+                <ul className="list-disc list-inside mt-1 space-y-1">
+                  <li>可执行文件是否存在于 bin 目录</li>
+                  <li>配置文件是否正确</li>
+                  <li>端口是否被占用</li>
+                  <li>是否有足够的权限</li>
+                  <li>进程依赖的服务是否正常</li>
+                </ul>
+              </div>
+            </div>
+            
+            <div className="modal-action">
+              <button 
+                className="btn btn-outline"
+                onClick={() => {
+                  if (errorProcessName) {
+                    openLogModal(errorProcessName);
+                    setIsErrorModalOpen(false);
+                  }
+                }}
+                disabled={!errorProcessName}
+              >
+                查看日志
+              </button>
+              <button 
+                className="btn btn-outline"
+                onClick={() => {
+                  if (errorProcessName) {
+                    handleStartProcess(errorProcessName);
+                    setIsErrorModalOpen(false);
+                  }
+                }}
+                disabled={!errorProcessName || isLoading}
+              >
+                重试启动
+              </button>
+              <button 
+                className="btn btn-primary" 
+                onClick={() => setIsErrorModalOpen(false)}
+              >
+                确定
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 日志查看模态框 */}
       {isLogModalOpen && (
