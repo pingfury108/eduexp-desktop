@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { StartEduTools, StopEduTools, GetEduToolsStatus, GetEduToolsOutput, GetEduExpConfig, UpdateEduExpConfig } from "../../wailsjs/go/main/App";
+import { AlertTriangle, Info, Copy, ExternalLink, Edit } from 'lucide-react';
 
 interface EduToolsService {
   status: 'running' | 'stopped' | 'error';
@@ -163,9 +164,7 @@ export default function ApiServerPage() {
                     onClick={() => setIsPortModalOpen(true)}
                     title="编辑端口"
                   >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                    </svg>
+                    <Edit className="h-4 w-4" />
                   </button>
                 </div>
               </div>
@@ -319,9 +318,7 @@ export default function ApiServerPage() {
               <div className="modal-box">
                 <div className="flex items-center gap-4 mb-4">
                   <div className="flex-shrink-0">
-                    <svg className="w-8 h-8 text-error" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.5 0L4.268 19.5c-.77.833.192 2.5 1.732 2.5z" />
-                    </svg>
+                    <AlertTriangle className="w-8 h-8 text-error" />
                   </div>
                   <div>
                     <h3 className="font-bold text-lg text-error">启动失败</h3>
@@ -337,9 +334,7 @@ export default function ApiServerPage() {
                 </div>
                 
                 <div className="flex gap-2 text-sm opacity-70 mb-4">
-                  <svg className="w-4 h-4 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
+                  <Info className="w-4 h-4 mt-0.5 flex-shrink-0" />
                   <div>
                     <p>请检查以下可能的原因：</p>
                     <ul className="list-disc list-inside mt-1 space-y-1">
@@ -379,9 +374,7 @@ export default function ApiServerPage() {
               <div className="modal-box">
                 <div className="flex items-center gap-4 mb-4">
                   <div className="flex-shrink-0">
-                    <svg className="w-8 h-8 text-info" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
+                    <Info className="w-8 h-8 text-info" />
                   </div>
                   <div>
                     <h3 className="font-bold text-lg text-info">访问服务</h3>
@@ -415,17 +408,13 @@ export default function ApiServerPage() {
                       }}
                       title="复制地址"
                     >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                      </svg>
+                      <Copy className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
                 
                 <div className="alert alert-info mb-4">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
+                  <Info className="w-4 h-4" />
                   <span className="text-sm">
                     如果无法访问服务，请检查：
                     <br />• 服务是否正常运行
@@ -442,9 +431,7 @@ export default function ApiServerPage() {
                       window.location.href = url;
                     }}
                   >
-                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                    </svg>
+                    <ExternalLink className="w-4 h-4 mr-2" />
                     在当前页面访问
                   </button>
                   <button 
@@ -458,9 +445,7 @@ export default function ApiServerPage() {
                       }
                     }}
                   >
-                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                    </svg>
+                    <ExternalLink className="w-4 h-4 mr-2" />
                     重试新窗口
                   </button>
                   <button 
