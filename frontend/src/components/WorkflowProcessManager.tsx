@@ -31,11 +31,10 @@ export default function WorkflowProcessManager() {
 
   const loadPortFromConfig = async () => {
     try {
-      const eduExpConfig = await GetEduExpConfig();
-      if (eduExpConfig && eduExpConfig.ServerPort) {
-        setWorkflowService(prev => ({ ...prev, port: eduExpConfig.ServerPort }));
-        setTempPort(eduExpConfig.ServerPort);
-      }
+      // 使用默认端口，因为端口配置已从EduExp配置中移除
+      const defaultPort = '8080';
+      setWorkflowService(prev => ({ ...prev, port: defaultPort }));
+      setTempPort(defaultPort);
     } catch (error) {
       console.error('Failed to load port from config:', error);
     }
@@ -70,9 +69,7 @@ export default function WorkflowProcessManager() {
 
   const savePortConfig = async () => {
     try {
-      const eduExpConfig = await GetEduExpConfig();
-      const updatedConfig = { ...eduExpConfig, ServerPort: tempPort };
-      await UpdateEduExpConfig(updatedConfig);
+      // 端口配置已从EduExp配置中移除，这里只更新本地状态
       setWorkflowService(prev => ({ ...prev, port: tempPort }));
       setIsPortModalOpen(false);
     } catch (error) {

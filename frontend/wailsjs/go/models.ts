@@ -109,10 +109,10 @@ export namespace main {
 		}
 	}
 	export class EduExpConfig {
-	    ServerPort: string;
-	    DataPath: string;
-	    CacheEnabled: boolean;
-	    BackupEnabled: boolean;
+	    ArkApiKey: string;
+	    ArkModeModel: string;
+	    ArkOcrModeModel: string;
+	    ArkTextModeModel: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new EduExpConfig(source);
@@ -120,10 +120,10 @@ export namespace main {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.ServerPort = source["ServerPort"];
-	        this.DataPath = source["DataPath"];
-	        this.CacheEnabled = source["CacheEnabled"];
-	        this.BackupEnabled = source["BackupEnabled"];
+	        this.ArkApiKey = source["ArkApiKey"];
+	        this.ArkModeModel = source["ArkModeModel"];
+	        this.ArkOcrModeModel = source["ArkOcrModeModel"];
+	        this.ArkTextModeModel = source["ArkTextModeModel"];
 	    }
 	}
 	export class GlobalConfig {

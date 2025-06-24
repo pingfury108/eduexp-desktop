@@ -23,11 +23,10 @@ type GlobalConfig struct {
 
 // EduExpConfig EduExp模块配置
 type EduExpConfig struct {
-	// TODO: 添加 EduExp 相关配置项
-	ServerPort    string `toml:"server_port"`    // 服务器端口
-	DataPath      string `toml:"data_path"`      // 数据目录路径
-	CacheEnabled  bool   `toml:"cache_enabled"`  // 是否启用缓存
-	BackupEnabled bool   `toml:"backup_enabled"` // 是否启用自动备份
+	ArkApiKey        string `toml:"ark_api_key"`         // ark(火山云) API Key
+	ArkModeModel     string `toml:"ark_mode_model"`      // ark mode 模型
+	ArkOcrModeModel  string `toml:"ark_ocr_mode_model"`  // ark ocr mode 模型
+	ArkTextModeModel string `toml:"ark_text_mode_model"` // ark text mode 模型
 }
 
 // WorkflowConfig 工作流配置
@@ -106,10 +105,10 @@ func GetDefaultConfig() *Config {
 			Theme: "light",
 		},
 		EduExp: EduExpConfig{
-			ServerPort:    "8080",
-			DataPath:      "",
-			CacheEnabled:  true,
-			BackupEnabled: true,
+			ArkApiKey:        "",
+			ArkModeModel:     "",
+			ArkOcrModeModel:  "",
+			ArkTextModeModel: "",
 		},
 		Workflow: WorkflowConfig{
 			ApiKey:    "",

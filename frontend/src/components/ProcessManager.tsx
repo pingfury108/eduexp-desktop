@@ -108,10 +108,8 @@ export default function ProcessManager() {
   // 加载全局端口配置
   const loadGlobalPort = async () => {
     try {
-      const eduExpConfig = await GetEduExpConfig();
-      if (eduExpConfig && eduExpConfig.ServerPort) {
-        setGlobalPort(eduExpConfig.ServerPort);
-      }
+      // 使用默认端口，因为端口配置已从EduExp配置中移除
+      setGlobalPort('8080');
     } catch (error) {
       console.error('Failed to load global port:', error);
     }

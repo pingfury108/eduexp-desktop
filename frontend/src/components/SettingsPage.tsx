@@ -7,10 +7,10 @@ interface GlobalSettings {
 }
 
 interface EduExpSettings {
-  serverPort: string;
-  dataPath: string;
-  cacheEnabled: boolean;
-  backupEnabled: boolean;
+  arkApiKey: string;
+  arkModeModel: string;
+  arkOcrModeModel: string;
+  arkTextModeModel: string;
 }
 
 interface WorkflowSettings {
@@ -50,10 +50,10 @@ export default function SettingsPage() {
   });
   
   const [eduexpSettings, setEduexpSettings] = useState<EduExpSettings>({
-    serverPort: '8080',
-    dataPath: '',
-    cacheEnabled: true,
-    backupEnabled: true
+    arkApiKey: '',
+    arkModeModel: '',
+    arkOcrModeModel: '',
+    arkTextModeModel: ''
   });
 
   const [workflowSettings, setWorkflowSettings] = useState<WorkflowSettings>({
@@ -153,18 +153,18 @@ export default function SettingsPage() {
         try {
           const eduexpConfig = await GetEduExpConfig();
           setEduexpSettings({
-            serverPort: eduexpConfig.ServerPort || '8080',
-            dataPath: eduexpConfig.DataPath || '',
-            cacheEnabled: eduexpConfig.CacheEnabled !== undefined ? eduexpConfig.CacheEnabled : true,
-            backupEnabled: eduexpConfig.BackupEnabled !== undefined ? eduexpConfig.BackupEnabled : true
+            arkApiKey: eduexpConfig.ArkApiKey || '',
+            arkModeModel: eduexpConfig.ArkModeModel || '',
+            arkOcrModeModel: eduexpConfig.ArkOcrModeModel || '',
+            arkTextModeModel: eduexpConfig.ArkTextModeModel || ''
           });
         } catch (error) {
           console.error('Failed to load eduexp config:', error);
           setEduexpSettings({
-            serverPort: '8080',
-            dataPath: '',
-            cacheEnabled: true,
-            backupEnabled: true
+            arkApiKey: '',
+            arkModeModel: '',
+            arkOcrModeModel: '',
+            arkTextModeModel: ''
           });
         }
 
@@ -260,10 +260,10 @@ export default function SettingsPage() {
           break;
         case 'eduexp':
           backendSettings = {
-            ServerPort: settings.serverPort,
-            DataPath: settings.dataPath,
-            CacheEnabled: settings.cacheEnabled,
-            BackupEnabled: settings.backupEnabled
+            ArkApiKey: settings.arkApiKey,
+            ArkModeModel: settings.arkModeModel,
+            ArkOcrModeModel: settings.arkOcrModeModel,
+            ArkTextModeModel: settings.arkTextModeModel
           };
           await UpdateEduExpConfig(backendSettings);
           console.log('Saved eduexp settings:', settings);
@@ -487,69 +487,69 @@ export default function SettingsPage() {
     <div className="space-y-0">
       <div className="mb-8">
         <h3 className="text-2xl font-bold text-base-content mb-6">EduExp配置</h3>
-        <p className="text-base-content opacity-70">配置EduExp模块的服务器和数据设置</p>
+        <p className="text-base-content opacity-70">配置EduExp模块的ark(火山云)API和模型设置</p>
       </div>
 
-      {/* 服务器端口 */}
+      {/* ark API Key */}
       <div className="form-control py-4 border-b border-base-300">
         <div className="flex justify-between items-center">
           <div>
-            <span className="text-base font-medium text-base-content">服务器端口</span>
+            <span className="text-base font-medium text-base-content">API 密钥</span>
+          </div>
+          <input
+            type="password"
+            className="input input-bordered w-64 text-base-content"
+            value={eduexpSettings.arkApiKey}
+            onChange={(e) => updateEduExpSetting('arkApiKey', e.target.value)}
+            placeholder="输入火山方舟 API 密钥"
+          />
+        </div>
+      </div>
+
+      {/* ark mode 模型 */}
+      <div className="form-control py-4 border-b border-base-300">
+        <div className="flex justify-between items-center">
+          <div>
+            <span className="text-base font-medium text-base-content">通用模型</span>
           </div>
           <input
             type="text"
-            className="input input-bordered w-48 text-base-content"
-            value={eduexpSettings.serverPort}
-            onChange={(e) => updateEduExpSetting('serverPort', e.target.value)}
-            placeholder="8080"
+            className="input input-bordered w-64 text-base-content"
+            value={eduexpSettings.arkModeModel}
+            onChange={(e) => updateEduExpSetting('arkModeModel', e.target.value)}
+            placeholder="输入通用模型名称"
           />
         </div>
       </div>
 
-      {/* 数据目录路径 */}
+      {/* ark ocr mode 模型 */}
       <div className="form-control py-4 border-b border-base-300">
         <div className="flex justify-between items-center">
           <div>
-            <span className="text-base font-medium text-base-content">数据目录路径</span>
+            <span className="text-base font-medium text-base-content">OCR 模型</span>
           </div>
           <input
             type="text"
-            className="input input-bordered w-48 text-base-content"
-            value={eduexpSettings.dataPath}
-            onChange={(e) => updateEduExpSetting('dataPath', e.target.value)}
-            placeholder="/path/to/data"
+            className="input input-bordered w-64 text-base-content"
+            value={eduexpSettings.arkOcrModeModel}
+            onChange={(e) => updateEduExpSetting('arkOcrModeModel', e.target.value)}
+            placeholder="输入 OCR 识别模型名称"
           />
         </div>
       </div>
 
-      {/* 启用缓存 */}
+      {/* ark text mode 模型 */}
       <div className="form-control py-4 border-b border-base-300">
         <div className="flex justify-between items-center">
           <div>
-            <span className="text-base font-medium text-base-content">启用缓存</span>
-            <p className="text-sm text-base-content opacity-70">提高数据访问性能</p>
+            <span className="text-base font-medium text-base-content">文本模型</span>
           </div>
-          <input 
-            type="checkbox" 
-            className="toggle toggle-primary"
-            checked={eduexpSettings.cacheEnabled}
-            onChange={(e) => updateEduExpSetting('cacheEnabled', e.target.checked)}
-          />
-        </div>
-      </div>
-
-      {/* 启用自动备份 */}
-      <div className="form-control py-4 border-b border-base-300">
-        <div className="flex justify-between items-center">
-          <div>
-            <span className="text-base font-medium text-base-content">启用自动备份</span>
-            <p className="text-sm text-base-content opacity-70">定期备份重要数据</p>
-          </div>
-          <input 
-            type="checkbox" 
-            className="toggle toggle-primary"
-            checked={eduexpSettings.backupEnabled}
-            onChange={(e) => updateEduExpSetting('backupEnabled', e.target.checked)}
+          <input
+            type="text"
+            className="input input-bordered w-64 text-base-content"
+            value={eduexpSettings.arkTextModeModel}
+            onChange={(e) => updateEduExpSetting('arkTextModeModel', e.target.value)}
+            placeholder="输入文本处理模型名称"
           />
         </div>
       </div>

@@ -62,10 +62,8 @@ func (a *App) StartWorkflowUI(extraArgs []string) string {
 		"--config", "config.json", // 使用相对路径，因为工作目录就是数据目录
 	}
 
-	// 添加端口参数（如果配置中有）
-	if config.EduExp.ServerPort != "" {
-		args = append(args, "--port", config.EduExp.ServerPort)
-	}
+	// 添加默认端口参数
+	args = append(args, "--port", "8080")
 
 	// 添加额外参数
 	args = append(args, extraArgs...)
